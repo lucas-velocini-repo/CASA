@@ -74,7 +74,7 @@ def register_new_device(
     data: DeviceRegisterRequest,
     db: Session = Depends(get_db),
 ):
-    device = register_device(
+    device, api_token = register_device(
         db=db,
         hardware_id=data.hardware_id,
         name=data.name,
@@ -86,4 +86,5 @@ def register_new_device(
         device_id=device.device_id,
         hardware_id=device.hardware_id,
         name=device.name,
+        api_token=api_token,
     )

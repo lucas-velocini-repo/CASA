@@ -57,3 +57,4 @@ class DeviceRegisterResponse(BaseModel):
     device_id: str
     hardware_id: str
     name: str
+    api_token: str | None = None

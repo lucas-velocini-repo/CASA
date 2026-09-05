@@ -25,6 +25,13 @@ class Device(Base):
         index=True,
     )
 
+    api_token_hash: Mapped[str | None] = mapped_column(
+        String(64),
+        unique=True,
+        nullable=True,
+        index=True,
+    )
+
     name: Mapped[str] = mapped_column(
         String(100),
         nullable=False,

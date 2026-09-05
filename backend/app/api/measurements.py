@@ -1,27 +1,39 @@
-from fastapi import APIRouter, Depends, Query
+from datetime import datetime
+
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Query,
+    status,
+)
+from fastapi.security import (
+    HTTPAuthorizationCredentials,
+    HTTPBearer,
+)
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-
 from app.schemas.measurement import (
     MeasurementCreate,
-    MeasurementResponse,
     MeasurementDataResponse,
+    MeasurementResponse,
 )
-
+from app.services.device_auth_service import (
+    authenticate_device,
+)
 from app.services.measurement_service import (
     create_measurement,
-    get_measurement_history,
     get_latest_measurements,
+    get_measurement_history,
 )
-
-from datetime import datetime
-
 
 router = APIRouter(
     prefix="/measurements",
     tags=["measurements"],
 )
+
+bearer_scheme = HTTPBearer(auto_error=False)
 
 
 @router.post(
@@ -31,8 +43,40 @@ router = APIRouter(
 )
 def receive_measurement(
     data: MeasurementCreate,
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ):
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing authentication token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    device = authenticate_device(
+        db=db,
+        token=credentials.credentials,
+    )
+
+    if device is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if not device.active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Device is inactive",
+        )
+
+    if device.device_id != data.device_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=("Token does not belong to this device"),
+        )
+
     measurement = create_measurement(
         db,
         data,
@@ -40,9 +84,10 @@ def receive_measurement(
 
     return MeasurementResponse(
         measurement_id=measurement.id,
-        device_id=data.device_id,
+        device_id=device.device_id,
         status="stored",
     )
+
 
 @router.get(
     "/history",
@@ -66,6 +111,7 @@ def measurement_history(
         end=end,
         limit=limit,
     )
+
 
 @router.get(
     "/latest",
