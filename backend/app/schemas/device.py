@@ -24,3 +24,12 @@ class DeviceResponse(BaseModel):
 
     created_at: datetime
     last_seen: datetime | None
+
+class DeviceRegisterRequest(BaseModel):
+    hardware_id: str
+    name: str
+
+class DeviceRegisterResponse(BaseModel):
+    device_id: str
+    hardware_id: str
+    name: str
