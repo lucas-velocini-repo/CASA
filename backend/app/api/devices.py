@@ -9,6 +9,15 @@ from app.schemas.device import (
     DeviceResponse,
 )
 
+from app.schemas.device import (
+    DeviceRegisterRequest,
+    DeviceRegisterResponse,
+)
+
+from app.services.device_service import (
+    register_device,
+)
+
 
 router = APIRouter(
     prefix="/devices",
@@ -62,3 +71,24 @@ def list_devices(
     ).all()
 
     return devices
+
+@router.post(
+    "/register",
+    response_model=DeviceRegisterResponse,
+    status_code=201,
+)
+def register_new_device(
+    data: DeviceRegisterRequest,
+    db: Session = Depends(get_db),
+):
+    device = register_device(
+        db=db,
+        hardware_id=data.hardware_id,
+        name=data.name,
+    )
+
+    return DeviceRegisterResponse(
+        device_id=device.device_id,
+        hardware_id=device.hardware_id,
+        name=device.name,
+    )
