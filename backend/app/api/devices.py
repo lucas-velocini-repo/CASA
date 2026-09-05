@@ -6,18 +6,13 @@ from app.db.database import get_db
 from app.models.device import Device
 from app.schemas.device import (
     DeviceCreate,
-    DeviceResponse,
-)
-
-from app.schemas.device import (
     DeviceRegisterRequest,
     DeviceRegisterResponse,
+    DeviceResponse,
 )
-
 from app.services.device_service import (
     register_device,
 )
-
 
 router = APIRouter(
     prefix="/devices",
@@ -34,10 +29,7 @@ def create_device(
     db: Session = Depends(get_db),
 ):
     existing_device = db.scalar(
-        select(Device).where(
-            Device.device_id ==
-            device_data.device_id
-        )
+        select(Device).where(Device.device_id == device_data.device_id)
     )
 
     if existing_device:
@@ -50,6 +42,8 @@ def create_device(
         device_id=device_data.device_id,
         hardware_id=device_data.hardware_id,
         name=device_data.name,
+        latitude=device_data.latitude,
+        longitude=device_data.longitude,
     )
 
     db.add(device)
@@ -66,11 +60,10 @@ def create_device(
 def list_devices(
     db: Session = Depends(get_db),
 ):
-    devices = db.scalars(
-        select(Device)
-    ).all()
+    devices = db.scalars(select(Device)).all()
 
     return devices
+
 
 @router.post(
     "/register",
@@ -85,6 +78,8 @@ def register_new_device(
         db=db,
         hardware_id=data.hardware_id,
         name=data.name,
+        latitude=data.latitude,
+        longitude=data.longitude,
     )
 
     return DeviceRegisterResponse(

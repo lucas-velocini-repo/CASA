@@ -174,10 +174,14 @@ def get_measurement_history(
         )
 
     query = query.order_by(
-        Measurement.timestamp.asc()
+        Measurement.timestamp.desc()
     ).limit(limit)
 
-    measurements = db.scalars(query).all()
+    measurements = list(
+        db.scalars(query).all()
+    )
+
+    measurements.reverse()
 
     return [
         measurement_to_response(measurement)

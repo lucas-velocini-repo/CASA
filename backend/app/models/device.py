@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, String
+from sqlalchemy import Boolean, DateTime, Float, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -9,9 +9,7 @@ from app.db.base import Base
 class Device(Base):
     __tablename__ = "devices"
 
-    id: Mapped[int] = mapped_column(
-        primary_key=True
-    )
+    id: Mapped[int] = mapped_column(primary_key=True)
 
     device_id: Mapped[str] = mapped_column(
         String(100),
@@ -50,6 +48,21 @@ class Device(Base):
     )
 
     last_seen: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    latitude: Mapped[float | None] = mapped_column(
+        Float,
+        nullable=True,
+    )
+
+    longitude: Mapped[float | None] = mapped_column(
+        Float,
+        nullable=True,
+    )
+
+    location_updated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
     )
