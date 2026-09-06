@@ -477,6 +477,10 @@ Já estão implementados:
 * identificação do hardware;
 * cadastro de novas estações;
 * geração de identificadores CASA;
+* reconexão automática após falhas de Wi-Fi;
+* armazenamento temporário de medições durante indisponibilidade de rede;
+* reenvio das medições pendentes;
+* conexão do módulo GPS;
 * autenticação individual das estações;
 * armazenamento das medições no PostgreSQL;
 * consulta de histórico;
@@ -500,10 +504,6 @@ Entre as próximas etapas estão:
 * implantação da infraestrutura em servidor na nuvem;
 * configuração de domínio e HTTPS;
 * testes com seis estações simultâneas;
-* reconexão automática após falhas de Wi-Fi;
-* armazenamento temporário de medições durante indisponibilidade de rede;
-* reenvio das medições pendentes;
-* implementação do módulo GPS;
 * backups automáticos do banco;
 * monitoramento da infraestrutura;
 * expansão gradual do número de estações.
