@@ -9,9 +9,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
-    ports:
-      - "5432:5432"
-
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -45,9 +42,6 @@ services:
       --port 8000
       "
 
-    ports:
-      - "8000:8000"
-
     healthcheck:
       test:
         [
@@ -73,15 +67,39 @@ services:
 
     container_name: casa-frontend
 
+    depends_on:
+      backend:
+        condition: service_healthy
+
+    restart: unless-stopped
+  
+  caddy:
+    image: caddy:2-alpine
+
+    container_name: casa-caddy
+
     ports:
-      - "3000:80"
+      - "80:80"
+      - "443:443"
+
+    volumes:
+      - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
 
     depends_on:
       backend:
         condition: service_healthy
+
+      frontend:
+        condition: service_started
 
     restart: unless-stopped
 
 
 volumes:
   postgres_data:
+
+  caddy_data:
+
+  caddy_config:
