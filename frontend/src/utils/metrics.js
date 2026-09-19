@@ -96,3 +96,18 @@ export function chartRows(rows, keys, budget = 1800) {
   }
   return [...indexes].sort((a, b) => a - b).map((i) => rows[i]);
 }
+
+export const PM_KEYS = ["pm1", "pm25", "pm4", "pm10"];
+export const OVERVIEW_KEYS = [
+  "temperature",
+  "humidity",
+  "pressure",
+  "light",
+  ...PM_KEYS,
+];
+
+export function exportKeys(tabId) {
+  if (tabId === "history") return Object.keys(metrics);
+  if (tabId === "overview") return OVERVIEW_KEYS;
+  return tabs.find((tab) => tab.id === tabId)?.keys || [];
+}

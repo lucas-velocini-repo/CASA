@@ -23,7 +23,7 @@ Para consultar o backend já existente na VM durante o desenvolvimento, crie
 `frontend/.env.local` (não versionado):
 
 ```dotenv
-VITE_API_PROXY_TARGET=https://SEU-DOMINIO/api
+VITE_API_PROXY_TARGET=https://t2phealth.com.br/api
 ```
 
 Ou `http://IP-DA-VM/api`, conforme a configuração real do servidor. Reinicie o
@@ -85,15 +85,25 @@ registros, erros, cancelamento, escala automática, redução visual e CSV.
 - A tabela mostra 50 linhas por página. Isso não limita a consulta nem o CSV.
 - Escala Y automática com margem; opção de incluir zero. Valores ausentes
   continuam ausentes, sem substituição por zero.
-- O campo `active` indica cadastro habilitado, não conectividade em tempo real.
-  Última comunicação e última medição são mostradas separadamente.
+- O status usa a última comunicação (`last_seen`): ativa até 6 minutos, inativa
+  em vermelho depois disso. O relógio é reavaliado a cada segundo e as estações
+  são consultadas a cada 30 segundos. O cadastro `active` não define esse status.
+  Última comunicação e última medição continuam separadas.
 - Exportação PNG inclui título, estação, período, séries e fuso.
 
 ## Identidade e próximas etapas
 
 A paleta usa branco, turquesa e azul-marinho da referência T2P. O cabeçalho usa
-uma assinatura tipográfica provisória, não o arquivo oficial da marca. Substitua
-pela logo original SVG/PNG sem os controles de navegação presentes no print.
+`assets/t2p-logo.png`, o arquivo original fornecido. O CSS enquadra a marca sem
+alterar a imagem.
+
+Na visão geral, as barras de PM da última leitura do período aparecem antes dos
+gráficos históricos, e o histórico de PM aparece ao final. As classes cumulativas
+são apresentadas separadamente, sem somá-las.
+
+O CSV sempre respeita o período aplicado. As abas individuais exportam apenas
+suas variáveis, com os campos de identificação e tempo. A visão geral exporta
+as quatro variáveis ambientais e PM. Dados históricos exporta todos os campos.
 
 Login, autorização por estação e administração continuam previstos para a V3.
 O ícone de usuário apenas reserva seu lugar no canto superior esquerdo.

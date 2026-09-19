@@ -1,6 +1,7 @@
 import { Thermometer, Droplets, Gauge, Sun } from "lucide-react";
+import ParticulateSnapshot from "./ParticulateSnapshot";
 import MeasurementChart from "./MeasurementChart";
-import { metrics, formatValue } from "../utils/metrics";
+import { metrics, formatValue, PM_KEYS } from "../utils/metrics";
 import { formatTimestamp } from "../utils/dates";
 
 const cards = [
@@ -36,6 +37,7 @@ export default function Overview({ rows, station, period, timeZone }) {
           </div>
         ))}
       </div>
+      <ParticulateSnapshot reading={last} timeZone={timeZone} />
       <div className="overview-charts">
         {cards.map(({ key }) => (
           <MeasurementChart
@@ -50,10 +52,16 @@ export default function Overview({ rows, station, period, timeZone }) {
           />
         ))}
       </div>
-      <p className="muted overview-hint">
-        Consulte as abas de particulados para acompanhar PM e NC ao longo do
-        tempo.
-      </p>
+      <div className="overview-pm-history">
+        <MeasurementChart
+          rows={rows}
+          keys={PM_KEYS}
+          title="Histórico de particulados PM"
+          station={station}
+          period={period}
+          timeZone={timeZone}
+        />
+      </div>
     </>
   );
 }

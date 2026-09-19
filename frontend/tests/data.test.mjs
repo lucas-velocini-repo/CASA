@@ -152,3 +152,35 @@ test("CSV preserves original precision, zero, UTC, chosen timezone and formula s
   assert.match(csv, /data_hora \(UTC\)/);
   assert.match(csv, /03:00/);
 });
+
+test("station activity expires after six minutes even when registration is enabled", async () => {
+  const { isStationActive, ACTIVITY_WINDOW_MS } =
+    await import("../src/utils/stationStatus.js");
+  const now = Date.parse("2026-09-19T18:00:00Z");
+  assert.equal(
+    isStationActive(new Date(now - ACTIVITY_WINDOW_MS).toISOString(), now),
+    true,
+  );
+  assert.equal(
+    isStationActive(new Date(now - ACTIVITY_WINDOW_MS - 1).toISOString(), now),
+    false,
+  );
+  assert.equal(isStationActive(null, now), false);
+  assert.equal(isStationActive("invalid", now), false);
+});
+
+test("CSV exports only the tab metrics while history includes every metric", async () => {
+  const { exportKeys, metrics } = await import("../src/utils/metrics.js");
+  const rows = [
+    {
+      measurement_id: 7,
+      timestamp: "2026-09-19T03:00:00Z",
+      values: { temperature: 25, pressure: 949, pm1: 2 },
+    },
+  ];
+  const csv = makeCsv(rows, "UTC", exportKeys("temperature"));
+  assert.match(csv, /temperature/);
+  assert.doesNotMatch(csv, /pressure|pm1/);
+  assert.deepEqual(exportKeys("history"), Object.keys(metrics));
+  assert.ok(exportKeys("overview").includes("pm10"));
+});

@@ -28,8 +28,11 @@ function csvCell(value) {
   return `"${text.replace(/"/g, '""')}"`;
 }
 
-export function makeCsv(rows, timeZone = TIME_ZONE) {
-  const keys = Object.keys(metrics);
+export function makeCsv(
+  rows,
+  timeZone = TIME_ZONE,
+  keys = Object.keys(metrics),
+) {
   const headers = [
     "measurement_id",
     "device_id",
@@ -58,9 +61,16 @@ export function makeCsv(rows, timeZone = TIME_ZONE) {
   );
 }
 
-export function exportCsv(rows, name, timeZone = TIME_ZONE) {
+export function exportCsv(
+  rows,
+  name,
+  timeZone = TIME_ZONE,
+  keys = Object.keys(metrics),
+) {
   download(
-    new Blob([makeCsv(rows, timeZone)], { type: "text/csv;charset=utf-8;" }),
+    new Blob([makeCsv(rows, timeZone, keys)], {
+      type: "text/csv;charset=utf-8;",
+    }),
     `${safeFilename(name)}.csv`,
   );
 }

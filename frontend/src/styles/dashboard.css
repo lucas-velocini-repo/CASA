@@ -1071,3 +1071,77 @@ tbody tr:nth-child(even) {
   margin-top: 24px;
   flex-wrap: wrap;
 }
+
+/* Focus belongs to the whole search control, including its icon. */
+.search:focus-within {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+.search input:focus,
+.search input:focus-visible {
+  outline: none;
+}
+.registration.inactive {
+  color: #b42318;
+  background: #fff0ee;
+  border-color: #f4c4be;
+}
+.brand {
+  position: relative;
+  display: block;
+  width: 190px;
+  height: 66px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.brand-logo {
+  position: absolute;
+  width: 220px;
+  max-width: none;
+  height: auto;
+  left: -18px;
+  top: -31px;
+}
+.particulate-snapshot {
+  margin-bottom: 20px;
+}
+.snapshot-canvas {
+  height: 210px;
+  width: 100%;
+}
+.snapshot-values {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 14px 8px;
+}
+.snapshot-values dt {
+  color: var(--muted);
+  font-size: 11px;
+}
+.snapshot-values dd {
+  margin: 6px 0 0;
+  font-weight: 600;
+  font-size: 16px;
+}
+.snapshot-values small {
+  font-size: 10px;
+  font-weight: 400;
+}
+.overview-pm-history {
+  margin-top: 20px;
+}
+@media (max-width: 760px) {
+  .brand {
+    width: 145px;
+    height: 48px;
+  }
+  .brand-logo {
+    width: 168px;
+    left: -14px;
+    top: -24px;
+  }
+  .snapshot-values {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

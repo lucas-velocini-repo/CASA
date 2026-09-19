@@ -1,13 +1,9 @@
 import { useCallback, useState } from "react";
-import {
-  Activity,
-  Download,
-  RefreshCw,
-  UserRound,
-  Settings,
-} from "lucide-react";
+import { Download, RefreshCw, UserRound, Settings } from "lucide-react";
 import SettingsDialog from "./components/SettingsDialog";
 import { readTimeZone } from "./utils/settings";
+import logo from "../assets/t2p-logo.png";
+import StationStatus from "./components/StationStatus";
 import StationSelector from "./components/StationSelector";
 import PeriodFilter from "./components/PeriodFilter";
 import StatusPanel from "./components/StatusPanel";
@@ -16,7 +12,7 @@ import HistoryTable from "./features/HistoryTable";
 import MeasurementChart from "./features/MeasurementChart";
 import { usePolling } from "./hooks/usePolling";
 import { fetchHistory, fetchStations } from "./services/api";
-import { tabs } from "./utils/metrics";
+import { tabs, exportKeys } from "./utils/metrics";
 import {
   initialPeriod,
   periodBounds,
@@ -53,9 +49,7 @@ function StationData({ device, latest, timeZone }) {
           </p>
         </div>
         <div className="station-meta">
-          <span className={`registration ${device.active ? "" : "inactive"}`}>
-            {device.active ? "Cadastro habilitado" : "Cadastro desabilitado"}
-          </span>
+          <StationStatus lastSeen={device.last_seen || latest?.received_at} />
           <small>
             Última comunicação:{" "}
             {formatTimestamp(device.last_seen, false, timeZone)}
@@ -101,8 +95,9 @@ function StationData({ device, latest, timeZone }) {
               onClick={() =>
                 exportCsv(
                   rows,
-                  `${name}_${period.startDate}_${period.endDate}`,
+                  `${name}_${tab}_${period.startDate}_${period.endDate}`,
                   timeZone,
+                  exportKeys(tab),
                 )
               }
             >
@@ -158,7 +153,7 @@ export default function App() {
   }
   const [selectedId, setSelectedId] = useState(null);
   const [revision, setRevision] = useState(0);
-  const stations = usePolling(`stations:${revision}`, fetchStations);
+  const stations = usePolling(`stations:${revision}`, fetchStations, 30_000);
   const devices = stations.data?.devices || [];
   const selected =
     devices.find((device) => device.device_id === selectedId) || devices[0];
@@ -181,11 +176,11 @@ export default function App() {
             className="brand"
             aria-label="T2P — Tecnologia que cuida"
           >
-            <span>
-              T<span className="brand-green">2</span>P
-              <Activity className="brand-pulse" size={30} />
-            </span>
-            <small>TECNOLOGIA QUE CUIDA</small>
+            <img
+              src={logo}
+              className="brand-logo"
+              alt="T2P — Tecnologia que cuida"
+            />
           </a>
         </div>
         <span className="topbar-title">Interface de monitoramento</span>
