@@ -216,6 +216,7 @@ export default function App() {
           <>
             <StationSelector
               devices={devices}
+              timeZone={timeZone}
               selectedId={selected.device_id}
               onSelect={setSelectedId}
             />

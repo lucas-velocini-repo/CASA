@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -9,7 +10,11 @@ from app.schemas.device import (
     DeviceRegisterRequest,
     DeviceRegisterResponse,
     DeviceResponse,
+    DeviceLocationUpdate,
+    DeviceLocationResponse,
 )
+from app.services.device_auth_service import authenticate_device
+from app.services.device_location_service import update_device_location
 from app.services.device_service import (
     register_device,
 )
@@ -18,6 +23,29 @@ router = APIRouter(
     prefix="/devices",
     tags=["devices"],
 )
+
+bearer_scheme = HTTPBearer(auto_error=False)
+
+
+@router.patch("/location", response_model=DeviceLocationResponse)
+def receive_device_location(
+    data: DeviceLocationUpdate,
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    db: Session = Depends(get_db),
+):
+    device = (
+        authenticate_device(db, credentials.credentials)
+        if credentials is not None else None
+    )
+    if device is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Missing or invalid authentication token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not device.active:
+        raise HTTPException(status_code=403, detail="Device is inactive")
+    return update_device_location(db, device, data)
 
 
 @router.post(
