@@ -527,3 +527,56 @@ Durante o desenvolvimento, versões desses componentes podem ser integradas ao r
 **Central de Acompanhamento de Saúde e Ambiente**
 
 Sistema de monitoramento ambiental distribuído baseado em estações ESP32, aquisição multiparamétrica, comunicação sem fio, armazenamento centralizado e visualização web.
+
+
+## Localização da estação (GPS)
+
+A localização atual pertence ao cadastro (`devices`), independentemente das
+medições ambientais. Os campos `latitude`, `longitude` e `location_updated_at`
+já são criados pela migração `91bef69f509d`; não há uma nova migração nesta versão.
+`location_updated_at` representa a obtenção da posição, em UTC, e não seu recebimento.
+
+### Atualizar localização
+
+`PATCH /api/devices/location`, com `Authorization: Bearer <token da estação>`:
+
+```json
+{
+  "latitude": -23.123456,
+  "longitude": -47.123456,
+  "acquired_at": "2026-10-05T18:00:00Z"
+}
+```
+
+`acquired_at` aceita data com fuso (convertida para UTC) ou Unix epoch em segundos,
+como enviado pelo firmware. O token identifica a estação; não envie `device_id`.
+São rejeitados: token ausente/inválido (401), estação desativada (403), coordenadas
+inválidas, data sem fuso, data anterior a 2024 ou mais de cinco minutos no futuro (422).
+
+A resposta 200 contém `device_id`, coordenadas, `location_updated_at` e `status`:
+`stored` quando a posição foi atualizada; `unchanged` para data igual ou anterior.
+Reenvios são idempotentes. Atualizações antigas não substituem as recentes, inclusive
+em requisições concorrentes. A rota não modifica `last_seen`.
+
+`GET /api/devices` expõe a posição ao card, que mostra também sua data no fuso escolhido.
+Medições ambientais podem continuar contendo a última posição conhecida ou `null`;
+essas medições não alteram a data da localização do cadastro.
+
+### Atualização coordenada
+
+1. Atualizar o backend e o frontend do CASA primeiro.
+2. Confirmar `alembic upgrade head` no banco conforme o procedimento existente.
+3. Atualizar o firmware da branch `postgre` e manter sua URL de medições terminando
+   em `/api/measurements`. O firmware deriva `/api/devices/location` desse endereço.
+4. Conferir a posição e a data no card. Sem GPS válido, as medições continuam funcionando.
+
+### Verificação local
+
+```bash
+cd backend
+python -m pip install -r requirements-dev.txt
+DATABASE_URL=sqlite:// python -m pytest -q tests
+```
+
+Os testes da API usam banco SQLite isolado, sem acessar o banco de produção.
+No frontend, executar `npm ci`, `npm test`, `npm run lint` e `npm run build`.

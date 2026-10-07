@@ -280,6 +280,11 @@ small,
   margin-top: 5px;
   line-height: 1.5;
 }
+.station-description .location-acquired {
+  display: block;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
 .sidebar-footer {
   margin-top: 36px;
   padding: 20px 10px;

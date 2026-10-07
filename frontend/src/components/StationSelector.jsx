@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { RadioTower, Search, MapPin } from "lucide-react";
+import { formatTimestamp } from "../utils/dates";
 
-export default function StationSelector({ devices, selectedId, onSelect }) {
+export default function StationSelector({ devices, selectedId, onSelect, timeZone }) {
   const [search, setSearch] = useState("");
   const filtered = devices.filter((device) =>
     `${device.name} ${device.device_id}`
@@ -59,6 +60,14 @@ export default function StationSelector({ devices, selectedId, onSelect }) {
                     ? `${device.latitude.toFixed(4)}, ${device.longitude.toFixed(4)}`
                     : "Localização indisponível"}
                 </small>
+                {Number.isFinite(device.latitude) &&
+                  Number.isFinite(device.longitude) && (
+                    <small className="location-acquired">
+                      {device.location_updated_at
+                        ? `Localização obtida em: ${formatTimestamp(device.location_updated_at, false, timeZone)}`
+                        : "Data da localização indisponível"}
+                    </small>
+                  )}
               </span>
             </button>
           ))}
