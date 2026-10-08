@@ -561,6 +561,9 @@ em requisições concorrentes. A rota não modifica `last_seen`.
 `GET /api/devices` expõe a posição ao card lateral e ao cabeçalho da estação.
 No cabeçalho, as coordenadas ficam abaixo do nome e a data de obtenção aparece
 abaixo da última comunicação, no fuso escolhido. O card lateral mostra apenas as coordenadas.
+O botão de pin ao lado das coordenadas no cabeçalho abre a posição no Google Maps,
+usando a precisão completa do GPS. No computador, abre em outra aba; no celular,
+o link universal pode abrir o aplicativo instalado ou o navegador, conforme as configurações do aparelho.
 Medições ambientais podem continuar contendo a última posição conhecida ou `null`;
 essas medições não alteram a data da localização do cadastro.
 

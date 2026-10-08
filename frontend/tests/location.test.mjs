@@ -37,6 +37,13 @@ test("GPS details appear in the header and cards keep only coordinates", async (
     assert.doesNotMatch(card, /Localização obtida em|05\/10\/2026/);
     const header = renderHeader(device, "America/Sao_Paulo");
     assert.match(header, /Localização: 0\.0000, 0\.0000/);
+    assert.match(header, /href="https:\/\/www\.google\.com\/maps\/search\/\?api=1&amp;query=0%2C0"/);
+    assert.match(header, /target="_blank" rel="noopener noreferrer"/);
+    assert.match(header, /aria-label="Abrir localização no Google Maps/);
+    const precise = renderHeader({
+      ...device, latitude: -22.8167123, longitude: -47.0649876,
+    }, "UTC");
+    assert.match(precise, /query=-22\.8167123%2C-47\.0649876/);
     assert.match(header, /class="station-meta".*Última comunicação:.*14:55.*Localização obtida em:.*15:00/);
     assert.doesNotMatch(header, /Última medição|14:50/);
     assert.match(renderHeader(device, "UTC"), /Localização obtida em:.*05\/10\/2026.*18:00/);
@@ -47,6 +54,7 @@ test("GPS details appear in the header and cards keep only coordinates", async (
     const missing = renderHeader(noLocation, "UTC");
     assert.match(missing, /Localização indisponível/);
     assert.doesNotMatch(missing, /Localização obtida em/);
+    assert.doesNotMatch(missing, /maps-link|google\.com\/maps/);
   } finally {
     await server.close();
   }

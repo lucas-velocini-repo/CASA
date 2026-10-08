@@ -1,3 +1,4 @@
+import { MapPin } from "lucide-react";
 import StationStatus from "./StationStatus";
 import { formatTimestamp } from "../utils/dates";
 
@@ -10,10 +11,24 @@ export default function StationHeader({ device, latest, timeZone }) {
       <div>
         <span className="eyebrow">MONITORAMENTO AMBIENTAL</span>
         <h1>{device.name || device.device_id}</h1>
-        <p>
-          {hasLocation
-            ? `Localização: ${device.latitude.toFixed(4)}, ${device.longitude.toFixed(4)}`
-            : "Localização indisponível"}
+        <p className="station-location">
+          <span>
+            {hasLocation
+              ? `Localização: ${device.latitude.toFixed(4)}, ${device.longitude.toFixed(4)}`
+              : "Localização indisponível"}
+          </span>
+          {hasLocation && (
+            <a
+              className="maps-link"
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${device.latitude},${device.longitude}`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Abrir localização no Google Maps (nova aba ou aplicativo)"
+              title="Abrir no Google Maps"
+            >
+              <MapPin size={15} aria-hidden="true" />
+            </a>
+          )}
         </p>
       </div>
       <div className="station-meta">
