@@ -558,7 +558,9 @@ A resposta 200 contém `device_id`, coordenadas, `location_updated_at` e `status
 Reenvios são idempotentes. Atualizações antigas não substituem as recentes, inclusive
 em requisições concorrentes. A rota não modifica `last_seen`.
 
-`GET /api/devices` expõe a posição ao card, que mostra também sua data no fuso escolhido.
+`GET /api/devices` expõe a posição ao card lateral e ao cabeçalho da estação.
+No cabeçalho, as coordenadas ficam abaixo do nome e a data de obtenção aparece
+abaixo da última comunicação, no fuso escolhido. O card lateral mostra apenas as coordenadas.
 Medições ambientais podem continuar contendo a última posição conhecida ou `null`;
 essas medições não alteram a data da localização do cadastro.
 
@@ -568,7 +570,7 @@ essas medições não alteram a data da localização do cadastro.
 2. Confirmar `alembic upgrade head` no banco conforme o procedimento existente.
 3. Atualizar o firmware da branch `postgre` e manter sua URL de medições terminando
    em `/api/measurements`. O firmware deriva `/api/devices/location` desse endereço.
-4. Conferir a posição e a data no card. Sem GPS válido, as medições continuam funcionando.
+4. Conferir a posição e a data no cabeçalho da estação. Sem GPS válido, as medições continuam funcionando.
 
 ### Verificação local
 
