@@ -3,7 +3,7 @@ import { Download, RefreshCw, UserRound, Settings } from "lucide-react";
 import SettingsDialog from "./components/SettingsDialog";
 import { readTimeZone } from "./utils/settings";
 import logo from "../assets/t2p-logo.png";
-import StationStatus from "./components/StationStatus";
+import StationHeader from "./components/StationHeader";
 import StationSelector from "./components/StationSelector";
 import PeriodFilter from "./components/PeriodFilter";
 import StatusPanel from "./components/StatusPanel";
@@ -17,7 +17,6 @@ import {
   initialPeriod,
   periodBounds,
   periodLabel,
-  formatTimestamp,
 } from "./utils/dates";
 import { exportCsv } from "./utils/export";
 import "./styles/dashboard.css";
@@ -39,23 +38,7 @@ function StationData({ device, latest, timeZone }) {
   const name = device.name || device.device_id;
   return (
     <main className="content-area">
-      <div className="station-header">
-        <div>
-          <span className="eyebrow">MONITORAMENTO AMBIENTAL</span>
-          <h1>{name}</h1>
-          <p>
-            Última medição:{" "}
-            {formatTimestamp(latest?.timestamp, false, timeZone)}
-          </p>
-        </div>
-        <div className="station-meta">
-          <StationStatus lastSeen={device.last_seen || latest?.received_at} />
-          <small>
-            Última comunicação:{" "}
-            {formatTimestamp(device.last_seen, false, timeZone)}
-          </small>
-        </div>
-      </div>
+      <StationHeader device={device} latest={latest} timeZone={timeZone} />
       <nav className="tabs" aria-label="Visualização dos dados">
         {tabs.map((item) => (
           <button
@@ -216,7 +199,6 @@ export default function App() {
           <>
             <StationSelector
               devices={devices}
-              timeZone={timeZone}
               selectedId={selected.device_id}
               onSelect={setSelectedId}
             />

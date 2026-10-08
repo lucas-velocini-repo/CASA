@@ -280,11 +280,6 @@ small,
   margin-top: 5px;
   line-height: 1.5;
 }
-.station-description .location-acquired {
-  display: block;
-  color: var(--muted);
-  overflow-wrap: anywhere;
-}
 .sidebar-footer {
   margin-top: 36px;
   padding: 20px 10px;
@@ -325,6 +320,29 @@ small,
 .station-header p {
   color: var(--muted);
   font-size: 12px;
+}
+.station-location {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.maps-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: white;
+  color: var(--green);
+  text-decoration: none;
+}
+.maps-link:hover {
+  background: #edf7f4;
+  border-color: #8dbdb2;
 }
 .station-meta {
   display: flex;
@@ -875,6 +893,10 @@ tbody tr:nth-child(even) {
   }
   .station-header h1 {
     font-size: 23px;
+  }
+  .maps-link {
+    width: 44px;
+    height: 44px;
   }
   .station-meta {
     max-width: none;
