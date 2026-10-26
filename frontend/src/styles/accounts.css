@@ -218,3 +218,19 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Administration replaces the sidebar and content together. */
+.main-layout > .admin-panel {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+@media (max-width: 700px) {
+  .app-shell .topbar { padding: 0 12px; gap: 8px; }
+  .app-shell .brand { width: 104px; height: 40px; }
+  .app-shell .brand-logo { width: 120px; left: -10px; top: -17px; }
+  .app-shell .header-actions { gap: 4px; }
+  .header-actions .project-badge { display: none; }
+  .app-shell .header-actions button { min-width: 32px; padding: 6px; }
+  .app-shell .header-actions .account-nav { font-size: 12px; white-space: nowrap; }
+}

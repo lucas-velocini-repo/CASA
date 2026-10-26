@@ -107,7 +107,7 @@ export default function AdminPanel({ currentUser, devices, onChange }) {
           </label>
           <label>
             Perfil
-            <select name="role">
+            <select aria-label="Perfil do convite" name="role">
               <option value="user">Usuário</option>
               <option value="admin">Administrador</option>
             </select>
@@ -266,7 +266,7 @@ export default function AdminPanel({ currentUser, devices, onChange }) {
         >
           <label>
             Pessoa
-            <select name="user_id" required defaultValue="">
+            <select aria-label="Pessoa" name="user_id" required defaultValue="">
               <option value="" disabled>
                 Selecione
               </option>
@@ -281,7 +281,7 @@ export default function AdminPanel({ currentUser, devices, onChange }) {
           </label>
           <label>
             Estação
-            <select name="device_id" required defaultValue="">
+            <select aria-label="Estação" name="device_id" required defaultValue="">
               <option value="" disabled>
                 Selecione
               </option>
