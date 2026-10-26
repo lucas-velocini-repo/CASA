@@ -2,6 +2,8 @@
 
 Implementação iniciada a partir do CASA `40d31ad` e do aplicativo `id-hardware` em `ef92866`. O firmware `f721823` continua enviando medições e localização com o token de cada estação. Esta atualização não altera o intervalo de aquisição nem grava contas no ESP32.
 
+Para executar o teste e a implantação com comandos completos, siga o [roteiro operacional](teste-e-implantacao-contas.md).
+
 ## Fluxo de uso
 
 1. A equipe cria o primeiro administrador na VM. No primeiro login web ele configura TOTP e guarda os dez códigos de recuperação.
@@ -62,7 +64,7 @@ O serviço `mail-worker` lê a fila transacional no mesmo PostgreSQL, tenta nova
 
 O `infra/Caddyfile` principal serve HTTPS e deixa o Caddy redirecionar HTTP. **Não o ative em produção antes de validar o envio HTTPS em cada ESP32.** O firmware atual usa `HTTPClient` sem configurar explicitamente a confiança dos certificados; a configuração de HTTPS do navegador não prova que o ESP32 está pronto.
 
-Para testar as contas preservando estações ainda configuradas para HTTP, use temporariamente:
+Para testar as contas preservando estações ainda configuradas para HTTP, seja por domínio ou IP, use temporariamente:
 
 ```dotenv
 CADDY_CONFIG_PATH=./infra/Caddyfile.http-ingestion
