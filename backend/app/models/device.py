@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Float, String
+from sqlalchemy import Boolean, DateTime, Float, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -8,6 +8,9 @@ from app.db.base import Base
 
 class Device(Base):
     __tablename__ = "devices"
+    # The initial migration created both this constraint and a unique index.
+    # Keep metadata aligned without changing existing production identifiers.
+    __table_args__ = (UniqueConstraint("device_id", name="devices_device_id_key"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
 

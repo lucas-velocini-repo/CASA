@@ -1,60 +1,68 @@
 import uuid
+from datetime import timedelta
 
-from sqlalchemy import select
+from fastapi import HTTPException
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
+from app.core.security import aware, decrypt, digest, encrypt, utcnow
+from app.models.accounts import Provisioning
 from app.models.device import Device
-from app.services.device_auth_service import (
-    generate_api_token,
-    hash_api_token,
-)
+from app.services.account_service import audit
+from app.services.device_auth_service import generate_api_token, hash_api_token
 
 
 def register_device(
-    db: Session,
-    hardware_id: str,
-    name: str,
-    latitude: float | None = None,
-    longitude: float | None = None,
+    db: Session, hardware_id: str, name: str, actor, latitude=None, longitude=None
 ) -> tuple[Device, str | None]:
-
-    existing_device = db.scalar(select(Device).where(Device.hardware_id == hardware_id))
-
-    if existing_device is not None:
-        if existing_device.api_token_hash is None:
-            api_token = generate_api_token()
-
-            existing_device.api_token_hash = hash_api_token(api_token)
-
+    # One station per hardware ID even if two phones provision concurrently.
+    if db.bind.dialect.name == "postgresql":
+        db.execute(
+            text("SELECT pg_advisory_xact_lock(:key)"),
+            {"key": int(digest(hardware_id)[:15], 16)},
+        )
+    existing = db.scalar(
+        select(Device).where(Device.hardware_id == hardware_id).with_for_update()
+    )
+    if existing:
+        pending = db.scalar(
+            select(Provisioning)
+            .where(Provisioning.device_id == existing.id)
+            .with_for_update()
+        )
+        if pending and not pending.confirmed_at and not existing.last_seen:
+            if aware(pending.expires_at) <= utcnow() or not pending.encrypted_token:
+                raise HTTPException(
+                    409,
+                    "Provisionamento expirado. A equipe deve reiniciar o provisionamento pendente.",
+                )
+            audit(db, actor, "station.provisioning.resumed", existing.device_id)
+            token = decrypt(pending.encrypted_token)
             db.commit()
-            db.refresh(existing_device)
-
-            return existing_device, api_token
-
-        return existing_device, None
-
-    temporary_device_id = f"TEMP-{uuid.uuid4()}"
-
-    api_token = generate_api_token()
-
+            return existing, token
+        # Never replace the credential of a working or already configured station.
+        return existing, None
+    token = generate_api_token()
     device = Device(
-        device_id=temporary_device_id,
+        device_id=f"TEMP-{uuid.uuid4()}",
         hardware_id=hardware_id,
         name=name,
         latitude=latitude,
         longitude=longitude,
-        api_token_hash=hash_api_token(api_token),
+        api_token_hash=hash_api_token(token),
     )
-
     db.add(device)
-
-    # Força o INSERT sem finalizar a transação,
-    # para o PostgreSQL gerar device.id.
     db.flush()
-
     device.device_id = f"CASA-{device.id:06d}"
-
+    db.add(
+        Provisioning(
+            device_id=device.id,
+            actor_id=actor.id,
+            encrypted_token=encrypt(token),
+            expires_at=utcnow() + timedelta(hours=24),
+        )
+    )
+    audit(db, actor, "station.provisioning.started", device.device_id)
     db.commit()
     db.refresh(device)
-
-    return device, api_token
+    return device, token

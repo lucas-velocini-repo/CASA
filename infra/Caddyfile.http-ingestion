@@ -1,0 +1,38 @@
+# Transitional compatibility: only the existing station ingestion routes accept HTTP.
+# Station credentials on these HTTP requests are NOT protected by TLS.
+# Switch to Caddyfile after validating HTTPS in every ESP32.
+{$CASA_DOMAIN} {
+    header {
+        X-Content-Type-Options nosniff
+        Referrer-Policy no-referrer
+        X-Frame-Options DENY
+    }
+    handle /api/* {
+        uri strip_prefix /api
+        reverse_proxy backend:8000
+    }
+    handle {
+        reverse_proxy frontend:80
+    }
+}
+http://{$CASA_DOMAIN} {
+    @measurements {
+        path /api/measurements
+        method POST
+    }
+    handle @measurements {
+        uri strip_prefix /api
+        reverse_proxy backend:8000
+    }
+    @location {
+        path /api/devices/location
+        method PATCH
+    }
+    handle @location {
+        uri strip_prefix /api
+        reverse_proxy backend:8000
+    }
+    handle {
+        redir https://{$CASA_DOMAIN}{uri} 308
+    }
+}

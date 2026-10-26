@@ -8,6 +8,10 @@ O projeto encontra-se atualmente em fase de validação, inicialmente com **6 es
 
 ---
 
+## Contas e permissões
+
+Esta versão inclui contas por convite, acesso por estação/período, administração e login compartilhado com o aplicativo. **Antes de implantar**, siga [o guia de contas e implantação](docs/contas-e-acessos.md), incluindo as variáveis novas, o primeiro administrador, o APK atualizado e a compatibilidade HTTP/HTTPS dos ESP32.
+
 ## Arquitetura
 
 O CASA é composto por quatro partes principais:
