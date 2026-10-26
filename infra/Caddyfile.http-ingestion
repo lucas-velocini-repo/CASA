@@ -1,6 +1,12 @@
 # Transitional compatibility: only the existing station ingestion routes accept HTTP.
 # Station credentials on these HTTP requests are NOT protected by TLS.
 # Switch to Caddyfile after validating HTTPS in every ESP32.
+{
+    # Manual fallback below redirects the website. Do not redirect station POSTs
+    # before the compatibility routes, including requests addressed to the VM IP.
+    auto_https disable_redirects
+}
+
 {$CASA_DOMAIN} {
     header {
         X-Content-Type-Options nosniff
@@ -15,7 +21,7 @@
         reverse_proxy frontend:80
     }
 }
-http://{$CASA_DOMAIN} {
+:80 {
     @measurements {
         path /api/measurements
         method POST

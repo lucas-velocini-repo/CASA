@@ -1,0 +1,67 @@
+# Standalone test stack: do not combine with compose.yaml using multiple -f flags.
+# docker compose --env-file .env.teste -p casa-teste -f compose.teste.yaml up -d --build
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    environment: &test_environment
+      CASA_ENV: development
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:?Defina o IP e a porta do computador de testes}
+      AUTH_ENCRYPTION_KEY: ${AUTH_ENCRYPTION_KEY:?Gere a chave de testes}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURITY: ${SMTP_SECURITY:-starttls}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  mail-worker:
+    build: ./backend
+    environment: *test_environment
+    command: python -m app.mail_worker
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "${TEST_HTTP_PORT:-8080}:80"
+    volumes:
+      - ./infra/Caddyfile.dev:/etc/caddy/Caddyfile:ro
+    depends_on:
+      - frontend
+      - backend
+
+volumes:
+  postgres_data:
