@@ -234,3 +234,9 @@
   .app-shell .header-actions button { min-width: 32px; padding: 6px; }
   .app-shell .header-actions .account-nav { font-size: 12px; white-space: nowrap; }
 }
+
+@media (max-width: 700px) {
+  .admin-form { flex-wrap: nowrap; }
+  .admin-form label { width: 100%; min-width: 0; max-width: 100%; flex: 0 1 auto; }
+  .admin-form input, .admin-form select { width: 100%; max-width: 100%; }
+}
