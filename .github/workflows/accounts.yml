@@ -117,7 +117,7 @@ jobs:
                   except HTTPError as error:
                       assert error.code == 401, (host, error.code)
                       break
-                  except URLError:
+                  except (URLError, ConnectionError, TimeoutError):
                       if attempt == 29:
                           raise
                       time.sleep(1)
