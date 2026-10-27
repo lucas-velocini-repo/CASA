@@ -6,6 +6,8 @@ from sqlalchemy import func, select
 from app.models.device import Device
 from app.models.measurement import Measurement
 from app.models.sensor_value import SensorValue
+from app.models.accounts import Provisioning
+from app.services.access_service import measurement_scope, require_device
 
 from sqlalchemy.orm import Session, joinedload
 
@@ -69,6 +71,10 @@ def create_measurement(
     device.last_seen = datetime.now(timezone.utc)
 
     db.add(measurement)
+    pending = db.scalar(select(Provisioning).where(Provisioning.device_id == device.id))
+    if pending and not pending.confirmed_at:
+        pending.confirmed_at = datetime.now(timezone.utc)
+        pending.encrypted_token = None
 
     try:
         db.commit()
@@ -138,13 +144,10 @@ def get_measurement_history(
     start: datetime | None = None,
     end: datetime | None = None,
     limit: int = 1000,
+    *, user,
 ) -> list[MeasurementDataResponse]:
 
-    device = db.scalar(
-        select(Device).where(
-            Device.device_id == device_id
-        )
-    )
+    device = require_device(db, user, device_id)
 
     if device is None:
         raise HTTPException(
@@ -159,7 +162,8 @@ def get_measurement_history(
             joinedload(Measurement.sensor_values),
         )
         .where(
-            Measurement.device_id == device.id
+            Measurement.device_id == device.id,
+            measurement_scope(user),
         )
     )
 
@@ -190,6 +194,7 @@ def get_measurement_history(
 
 def get_latest_measurements(
     db: Session,
+    user,
 ) -> list[MeasurementDataResponse]:
 
     latest_timestamp = (
@@ -199,6 +204,7 @@ def get_latest_measurements(
                 "max_timestamp"
             ),
         )
+        .where(measurement_scope(user))
         .group_by(Measurement.device_id)
         .subquery()
     )

@@ -1,0 +1,245 @@
+.account-page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  background: #f3f7fb;
+  padding: 24px;
+  color: #17324b;
+  font-family: Arial, sans-serif;
+}
+.account-card {
+  width: min(100%, 460px);
+  box-sizing: border-box;
+  padding: 32px;
+  background: #fff;
+  border: 1px solid #dce7f0;
+  border-radius: 18px;
+  box-shadow: 0 12px 40px #17324b12;
+}
+.account-logo {
+  max-width: 150px;
+  max-height: 80px;
+  object-fit: contain;
+  margin-bottom: 14px;
+}
+.account-card h1 {
+  font-size: 25px;
+  line-height: 1.2;
+  margin: 10px 0;
+}
+.account-card p,
+.admin-panel p {
+  line-height: 1.6;
+  color: #52677c;
+}
+.account-card form,
+.account-card label,
+.admin-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.account-card form {
+  gap: 18px;
+  margin: 24px 0 10px;
+}
+.account-card label,
+.admin-form label {
+  font-size: 14px;
+  font-weight: 600;
+}
+.account-card label span {
+  font-weight: 400;
+  color: #52677c;
+}
+.account-card input,
+.admin-panel input,
+.admin-panel select {
+  font: inherit;
+  padding: 11px 12px;
+  border: 1px solid #bdcedd;
+  border-radius: 8px;
+  min-width: 0;
+  box-sizing: border-box;
+  background: white;
+  color: #17324b;
+}
+.account-card button,
+.admin-panel button {
+  font: inherit;
+  background: #075db5;
+  border: 1px solid #075db5;
+  padding: 11px 15px;
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+}
+.account-card button:disabled,
+.admin-panel button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.account-card .account-link {
+  display: block;
+  background: transparent;
+  border: 0;
+  color: #075db5;
+  padding: 12px 0;
+}
+.account-card small {
+  display: block;
+  color: #52677c;
+  line-height: 1.5;
+}
+.account-error {
+  padding: 12px;
+  background: #fff0ef;
+  border-left: 4px solid #bc3025;
+  color: #8b221b !important;
+  border-radius: 4px;
+}
+.account-notice {
+  padding: 12px;
+  background: #edf8f1;
+  color: #19643d !important;
+  border-radius: 6px;
+}
+.setup-key {
+  display: block;
+  overflow-wrap: anywhere;
+  padding: 16px;
+  background: #f1f6fb;
+  user-select: all;
+}
+.recovery-codes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 16px 0;
+}
+.recovery-codes code {
+  font-size: 12px;
+  user-select: all;
+}
+.admin-panel {
+  width: 100%;
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: 28px;
+  box-sizing: border-box;
+  color: #17324b;
+}
+.admin-panel h1 {
+  font-size: 26px;
+}
+.admin-panel h2 {
+  font-size: 19px;
+  margin: 0 0 16px;
+}
+.admin-section {
+  background: white;
+  padding: 22px;
+  margin: 20px 0;
+  border: 1px solid #dce7f0;
+  border-radius: 12px;
+}
+.admin-form {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  align-items: end;
+}
+.admin-form label {
+  flex: 1;
+  min-width: 180px;
+}
+.admin-table-scroll {
+  overflow-x: auto;
+}
+.admin-panel table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 14px;
+  margin-top: 16px;
+}
+.admin-panel th,
+.admin-panel td {
+  text-align: left;
+  padding: 13px 10px;
+  border-bottom: 1px solid #e5edf4;
+  vertical-align: middle;
+}
+.admin-panel td small {
+  display: block;
+  color: #52677c;
+  margin-top: 5px;
+}
+.admin-actions {
+  display: flex;
+  gap: 8px;
+}
+.admin-panel td button {
+  font-size: 13px;
+  padding: 8px 10px;
+}
+.account-name {
+  font-size: 13px;
+  max-width: 170px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.header-actions .account-nav {
+  font-size: 13px;
+  width: auto;
+  padding: 8px 10px;
+}
+@media (max-width: 700px) {
+  .account-card {
+    padding: 24px;
+  }
+  .admin-panel {
+    padding: 12px;
+  }
+  .admin-section {
+    padding: 16px;
+  }
+  .account-name {
+    display: none;
+  }
+  .topbar-title {
+    display: none;
+  }
+  .admin-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .recovery-codes {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Administration replaces the sidebar and content together. */
+.main-layout > .admin-panel {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+@media (max-width: 700px) {
+  .app-shell .topbar { padding: 0 12px; gap: 8px; }
+  .app-shell .brand { width: 104px; height: 40px; }
+  .app-shell .brand-logo { width: 120px; left: -10px; top: -17px; }
+  .app-shell .header-actions { gap: 4px; }
+  .header-actions .project-badge { display: none; }
+  .app-shell .header-actions button { min-width: 32px; padding: 6px; }
+  .app-shell .header-actions .account-nav { font-size: 12px; white-space: nowrap; }
+}
+
+@media (max-width: 700px) {
+  .admin-form { flex-wrap: nowrap; }
+  .admin-form label { width: 100%; min-width: 0; max-width: 100%; flex: 0 1 auto; }
+  .admin-form input, .admin-form select { width: 100%; max-width: 100%; }
+}
+
+.interval-control { display: grid; gap: 8px; min-width: 220px; max-width: 300px; }
+.interval-control label { display: grid; gap: 6px; font-size: 12px; }

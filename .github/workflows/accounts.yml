@@ -1,0 +1,143 @@
+name: Accounts and station access
+on:
+  pull_request:
+  push:
+    branches: [main, feature/user-accounts]
+permissions:
+  contents: read
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: casa_accounts_test
+          POSTGRES_USER: casa_test
+          POSTGRES_PASSWORD: test_only_password
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U casa_test -d casa_accounts_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      CASA_ENV: test
+      PUBLIC_APP_URL: http://localhost:5173
+      DATABASE_URL: postgresql+psycopg://casa_test:test_only_password@localhost:5432/casa_accounts_test
+      TEST_DATABASE_URL: postgresql+psycopg://casa_test:test_only_password@localhost:5432/casa_accounts_test
+      PYTHONPATH: .
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements-dev.txt
+      - run: alembic upgrade head
+      - run: alembic check
+      - run: pytest -q
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run lint
+      - run: npm run build
+  test-stack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Prepare isolated test environment
+        run: |
+          cp .env.teste.example .env.teste
+          python3 - <<'PY'
+          import base64, secrets
+          from pathlib import Path
+          p = Path('.env.teste')
+          s = p.read_text().replace('AUTH_ENCRYPTION_KEY=', 'AUTH_ENCRYPTION_KEY=' + base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())
+          s = s.replace('http://192.168.1.100:8080', 'http://127.0.0.1:18080').replace('TEST_HTTP_PORT=8080', 'TEST_HTTP_PORT=18080')
+          p.write_text(s)
+          PY
+      - name: Start standalone stack
+        run: docker compose --env-file .env.teste -p casa-teste-ci -f compose.teste.yaml up -d --build --wait --wait-timeout 240
+      - name: Seed and check synthetic data
+        run: |
+          docker compose --env-file .env.teste -p casa-teste-ci -f compose.teste.yaml exec -T backend python - <<'PY'
+          from app.db.database import SessionLocal
+          from app.models.accounts import User
+          from app.core.security import PASSWORDS, utcnow
+          with SessionLocal() as db:
+              db.add(User(email='ci@example.com', name='CI admin', role='admin', status='active', verified_at=utcnow(), password_hash=PASSWORDS.hash('Only a disposable CI password!')))
+              db.commit()
+          PY
+          docker compose --env-file .env.teste -p casa-teste-ci -f compose.teste.yaml exec -T backend python -m app.demo_seed
+          docker compose --env-file .env.teste -p casa-teste-ci -f compose.teste.yaml exec -T backend python -m app.demo_seed
+          docker compose --env-file .env.teste -p casa-teste-ci -f compose.teste.yaml exec -T backend python - <<'PY'
+          from sqlalchemy import select, func
+          from app.db.database import SessionLocal
+          from app.models.device import Device
+          from app.models.measurement import Measurement
+          from app.models.sensor_value import SensorValue
+          with SessionLocal() as db:
+              assert db.scalar(select(func.count()).select_from(Device)) == 2
+              assert db.scalar(select(func.count()).select_from(Measurement)) == 48
+              assert db.scalar(select(SensorValue.pm25).limit(1)) == 3
+              assert all(d.location_updated_at for d in db.scalars(select(Device)))
+          PY
+          curl --fail --retry 10 --retry-all-errors --retry-delay 2 http://127.0.0.1:18080/api/health
+      - name: Validate production and transitional Caddy configurations
+        run: |
+          docker run --rm -e CASA_DOMAIN=localhost -v "$PWD/infra:/configs:ro" caddy:2-alpine caddy validate --config /configs/Caddyfile --adapter caddyfile
+          docker run --rm -e CASA_DOMAIN=localhost -v "$PWD/infra:/configs:ro" caddy:2-alpine caddy validate --config /configs/Caddyfile.http-ingestion --adapter caddyfile
+          docker run -d --name casa-routing-ci --network casa-teste-ci_default -e CASA_DOMAIN=localhost -p 127.0.0.1:18081:80 -v "$PWD/infra:/configs:ro" caddy:2-alpine caddy run --config /configs/Caddyfile.http-ingestion --adapter caddyfile
+          python3 - <<'PY'
+          import json, time
+          from urllib.request import Request, urlopen, HTTPRedirectHandler, build_opener
+          from urllib.error import HTTPError, URLError
+          body = json.dumps({'device_id':'DEMO', 'timestamp':1780000000, 'pm':{}, 'nc':{}}).encode()
+          class NoRedirect(HTTPRedirectHandler):
+              def redirect_request(self, *args, **kwargs):
+                  return None
+          opener = build_opener(NoRedirect)
+          for host in ['localhost', '127.0.0.1']:
+              for attempt in range(30):
+                  try:
+                      opener.open(Request('http://127.0.0.1:18081/api/measurements', data=body, headers={'Host':host,'Content-Type':'application/json'}), timeout=5)
+                      raise AssertionError('Anonymous station ingestion was accepted')
+                  except HTTPError as error:
+                      assert error.code == 401, (host, error.code)
+                      break
+                  except (URLError, ConnectionError, TimeoutError):
+                      if attempt == 29:
+                          raise
+                      time.sleep(1)
+          for path, method, payload in [('/api/devices/config', 'GET', None), ('/api/devices/config/report', 'POST', json.dumps({'revision':0,'interval_seconds':300,'firmware_version':'test'}).encode())]:
+              for host in ['localhost', '127.0.0.1']:
+                  try:
+                      opener.open(Request('http://127.0.0.1:18081' + path, method=method, data=payload, headers={'Host':host,'Content-Type':'application/json'}), timeout=5)
+                      raise AssertionError('Anonymous station configuration was accepted')
+                  except HTTPError as error:
+                      assert error.code == 401, (path, host, error.code)
+          try:
+              opener.open(Request('http://127.0.0.1:18081/', headers={'Host':'localhost'}), timeout=5)
+              raise AssertionError('Website did not redirect to HTTPS')
+          except HTTPError as error:
+              assert error.code == 308 and error.headers['Location'].startswith('https://localhost')
+          PY
+      - name: Clean up test services
+        if: always()
+        run: |
+          docker logs --tail=40 casa-routing-ci || true
+          docker rm -fv casa-routing-ci || true
+          docker compose --env-file .env.teste -p casa-teste-ci -f compose.teste.yaml logs --tail=40 backend caddy mail-worker
+          docker compose --env-file .env.teste -p casa-teste-ci -f compose.teste.yaml down

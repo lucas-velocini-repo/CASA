@@ -8,6 +8,10 @@ O projeto encontra-se atualmente em fase de validação, inicialmente com **6 es
 
 ---
 
+## Contas e permissões
+
+Esta versão inclui contas por convite, acesso por estação/período, administração e login compartilhado com o aplicativo. **Antes de implantar**, siga [o guia de contas e implantação](docs/contas-e-acessos.md), incluindo as variáveis novas, o primeiro administrador, o APK atualizado e a compatibilidade HTTP/HTTPS dos ESP32. Para executar a homologação, use o [passo a passo de teste e implantação](docs/teste-e-implantacao-contas.md).
+
 ## Arquitetura
 
 O CASA é composto por quatro partes principais:
@@ -585,3 +589,5 @@ DATABASE_URL=sqlite:// python -m pytest -q tests
 
 Os testes da API usam banco SQLite isolado, sem acessar o banco de produção.
 No frontend, executar `npm ci`, `npm test`, `npm run lint` e `npm run build`.
+
+Intervalo remoto de aquisição e testes incrementais do aplicativo: [guia](docs/intervalos-e-ajustes-do-app.md).

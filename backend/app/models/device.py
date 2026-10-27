@@ -1,13 +1,16 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Float, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Boolean, DateTime, Float, String, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
 
 class Device(Base):
     __tablename__ = "devices"
+    # The initial migration created both this constraint and a unique index.
+    # Keep metadata aligned without changing existing production identifiers.
+    __table_args__ = (UniqueConstraint("device_id", name="devices_device_id_key"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
@@ -73,3 +76,12 @@ class Device(Base):
         DateTime(timezone=True),
         nullable=True,
     )
+
+
+    configuration: Mapped["StationConfiguration | None"] = relationship(
+        "StationConfiguration", uselist=False, lazy="selectin", viewonly=True
+    )
+
+    @property
+    def measurement_interval_seconds(self):
+        return self.configuration.reported_interval_seconds if self.configuration else None

@@ -13,6 +13,8 @@ from app.db.base import Base
 from app.db.database import get_db
 from app.main import app
 from app.models.device import Device
+from app.models.accounts import User, UserSession
+from app.core.security import digest, utcnow, COOKIE
 from app.services.device_auth_service import hash_api_token
 
 
@@ -29,6 +31,10 @@ def client():
                 api_token_hash=hash_api_token(f"token-{i}"),
                 last_seen=datetime(2026, 1, 1, tzinfo=timezone.utc),
             ))
+        admin = User(email="location-test@example.com", name="Admin", role="admin", status="active", totp_enabled=True)
+        db.add(admin)
+        db.flush()
+        db.add(UserSession(user_id=admin.id, token_hash=digest("location-admin-session"), csrf_hash=digest("csrf"), client="web", mfa_authenticated=True, expires_at=utcnow() + timedelta(hours=1)))
         db.commit()
 
     def override_db():
@@ -37,6 +43,7 @@ def client():
 
     app.dependency_overrides[get_db] = override_db
     with TestClient(app) as test_client:
+        test_client.cookies.set(COOKIE, "location-admin-session")
         yield test_client
     app.dependency_overrides.clear()
     engine.dispose()
