@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from sqlalchemy import Boolean, DateTime, Float, String, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
@@ -76,3 +76,12 @@ class Device(Base):
         DateTime(timezone=True),
         nullable=True,
     )
+
+
+    configuration: Mapped["StationConfiguration | None"] = relationship(
+        "StationConfiguration", uselist=False, lazy="selectin", viewonly=True
+    )
+
+    @property
+    def measurement_interval_seconds(self):
+        return self.configuration.reported_interval_seconds if self.configuration else None

@@ -240,3 +240,6 @@
   .admin-form label { width: 100%; min-width: 0; max-width: 100%; flex: 0 1 auto; }
   .admin-form input, .admin-form select { width: 100%; max-width: 100%; }
 }
+
+.interval-control { display: grid; gap: 8px; min-width: 220px; max-width: 300px; }
+.interval-control label { display: grid; gap: 6px; font-size: 12px; }

@@ -8,6 +8,7 @@ const labels = {
   "account.updated": "Conta atualizada",
   "station.access.granted": "Acesso concedido",
   "station.access.revoked": "Acesso revogado",
+  "station.interval.requested": "Intervalo solicitado",
   "station.updated": "Estação atualizada",
   "account.login": "Entrada na conta",
   "account.logout": "Saída da conta",
@@ -33,12 +34,12 @@ export default function AdminPanel({ currentUser, devices, onChange }) {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const loader = useCallback(async (signal) => {
-    const [users, access, audit, mail] = await Promise.all(
-      ["users", "access", "audit", "mail-status"].map((path) =>
+    const [users, access, audit, mail, configurations] = await Promise.all(
+      ["users", "access", "audit", "mail-status", "device-configurations"].map((path) =>
         apiRequest(`/admin/${path}`, { signal }),
       ),
     );
-    return { users, access, audit, mail };
+    return { users, access, audit, mail, configurations };
   }, []);
   const state = usePolling(`admin:${revision}`, loader, 30_000);
   async function run(task, message) {
@@ -355,6 +356,7 @@ export default function AdminPanel({ currentUser, devices, onChange }) {
               <tr>
                 <th>Estação</th>
                 <th>Recebimento de dados</th>
+                <th>Intervalo de aquisição</th>
                 <th>Ações</th>
               </tr>
             </thead>
@@ -366,6 +368,9 @@ export default function AdminPanel({ currentUser, devices, onChange }) {
                     <small>{d.device_id}</small>
                   </td>
                   <td>{d.active ? "Habilitado" : "Desativado"}</td>
+                  <td>
+                    <IntervalControl device={d} config={state.data?.configurations.find((c) => c.device_id === d.id)} busy={busy} run={run} />
+                  </td>
                   <td className="admin-actions">
                     <button
                       disabled={busy}
@@ -474,5 +479,26 @@ export default function AdminPanel({ currentUser, devices, onChange }) {
         <small>Exibindo as últimas 100 ações.</small>
       </section>
     </main>
+  );
+}
+
+
+function IntervalControl({ device, config, busy, run }) {
+  const [seconds, setSeconds] = useState("");
+  return (
+    <form className="interval-control" onSubmit={(event) => {
+      event.preventDefault();
+      run(() => apiRequest(`/admin/devices/${device.id}/configuration`, {
+        method: "PATCH", body: { interval_seconds: Number(seconds) },
+      }), "Intervalo solicitado. Aguarde a confirmação da estação.");
+    }}>
+      <span>Confirmado: {config?.reported_interval_seconds ? `${config.reported_interval_seconds} s` : "aguardando firmware compatível"}</span>
+      {config?.desired_interval_seconds != null && <small>Solicitado: {config.desired_interval_seconds} s · {config.pending ? "pendente" : "aplicado"}</small>}
+      {config?.reported_at && <small>Confirmação: {new Date(config.reported_at).toLocaleString("pt-BR")}</small>}
+      <label>Intervalo em segundos — {device.name}
+        <input aria-label={`Intervalo em segundos de ${device.name}`} type="number" min={30} max={86400} step={1} value={seconds} onChange={(e) => setSeconds(e.target.value)} required placeholder="300 = 5 minutos" />
+      </label>
+      <button disabled={busy}>Solicitar intervalo</button>
+    </form>
   );
 }

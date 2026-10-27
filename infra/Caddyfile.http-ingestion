@@ -1,4 +1,4 @@
-# Transitional compatibility: only the existing station ingestion routes accept HTTP.
+# Transitional compatibility: only station ingestion/configuration routes accept HTTP.
 # Station credentials on these HTTP requests are NOT protected by TLS.
 # Switch to Caddyfile after validating HTTPS in every ESP32.
 {
@@ -35,6 +35,22 @@
         method PATCH
     }
     handle @location {
+        uri strip_prefix /api
+        reverse_proxy backend:8000
+    }
+    @configuration {
+        path /api/devices/config
+        method GET
+    }
+    handle @configuration {
+        uri strip_prefix /api
+        reverse_proxy backend:8000
+    }
+    @configurationReport {
+        path /api/devices/config/report
+        method POST
+    }
+    handle @configurationReport {
         uri strip_prefix /api
         reverse_proxy backend:8000
     }

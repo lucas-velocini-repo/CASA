@@ -589,3 +589,5 @@ DATABASE_URL=sqlite:// python -m pytest -q tests
 
 Os testes da API usam banco SQLite isolado, sem acessar o banco de produção.
 No frontend, executar `npm ci`, `npm test`, `npm run lint` e `npm run build`.
+
+Intervalo remoto de aquisição e testes incrementais do aplicativo: [guia](docs/intervalos-e-ajustes-do-app.md).

@@ -73,5 +73,6 @@ def visible_device(db, user, device):
         result.latitude = result.longitude = result.location_updated_at = None
     if not allowed(device.last_seen):
         result.last_seen = None
+        result.measurement_interval_seconds = None
     result.hardware_id = None
     return result

@@ -137,6 +137,7 @@ export default function AccountGate({ children }) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [showAdminCode, setShowAdminCode] = useState(false);
   useEffect(() => {
     const controller = new AbortController();
     if (!initialAction.kind)
@@ -258,7 +259,7 @@ export default function AccountGate({ children }) {
         {mode === "login"
           ? "Acompanhe as estações vinculadas à sua conta."
           : settingPassword
-            ? "Use uma senha com pelo menos 15 caracteres. Você pode usar uma frase."
+            ? "Use uma senha com pelo menos 8 caracteres. Você pode usar uma frase."
             : "Informe o e-mail da sua conta para receber as instruções."}
       </p>
       <form onSubmit={submit} key={mode}>
@@ -283,7 +284,7 @@ export default function AccountGate({ children }) {
               autoComplete={
                 settingPassword ? "new-password" : "current-password"
               }
-              minLength={settingPassword ? 15 : 1}
+              minLength={settingPassword ? 8 : 1}
               maxLength={128}
               required
             />
@@ -297,13 +298,18 @@ export default function AccountGate({ children }) {
               type="password"
               autoComplete="new-password"
               required
-              minLength={15}
+              minLength={8}
               maxLength={128}
             />
           </label>
         )}
         {mode === "login" && (
-          <label>
+          <button type="button" className="account-link" aria-expanded={showAdminCode} aria-controls="admin-login-code" onClick={() => setShowAdminCode((value) => !value)}>
+            {showAdminCode ? "Ocultar código de administrador" : "Sou administrador"}
+          </button>
+        )}
+        {mode === "login" && showAdminCode && (
+          <label id="admin-login-code">
             Código de autenticação <span>(administradores)</span>
             <input
               name="mfa_code"

@@ -1,5 +1,8 @@
 # Passo a passo: testar e implantar contas no CASA
 
+Para os ajustes posteriores de login, app e intervalo remoto, continue em
+[Intervalos e ajustes do app](intervalos-e-ajustes-do-app.md).
+
 Este roteiro separa **computador de testes** e **VM de produção**. Os comandos locais funcionam em Ubuntu ou Windows com Git Bash e Docker Desktop em execução. Na VM, use o terminal Linux habitual do projeto. Troque os endereços e e-mails de exemplo pelos seus.
 
 Não faça merge das PRs antes da homologação. Os testes devem usar dados fictícios e um banco novo. Não restaure o banco real no computador de testes e não aponte `TEST_DATABASE_URL` para produção: os testes automatizados apagam suas tabelas de teste.

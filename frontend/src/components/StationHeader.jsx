@@ -32,7 +32,7 @@ export default function StationHeader({ device, latest, timeZone }) {
         </p>
       </div>
       <div className="station-meta">
-        <StationStatus lastSeen={device.last_seen || latest?.received_at} />
+        <StationStatus lastSeen={device.last_seen || latest?.received_at} intervalSeconds={device.measurement_interval_seconds} />
         <small>
           Última comunicação:{" "}
           {formatTimestamp(device.last_seen, false, timeZone)}

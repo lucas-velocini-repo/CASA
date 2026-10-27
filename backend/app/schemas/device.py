@@ -58,6 +58,7 @@ class DeviceResponse(BaseModel):
     location_updated_at: datetime | None = None
 
     firmware_version: str | None
+    measurement_interval_seconds: int | None = None
     active: bool
 
     created_at: datetime

@@ -27,9 +27,9 @@ def main():
                 parser.error(
                     "Já existe um administrador. Use o painel para convidar os demais."
                 )
-            password = getpass.getpass("Senha (mínimo 15 caracteres): ")
+            password = getpass.getpass("Senha (mínimo 8 caracteres): ")
             if (
-                len(password) < 15
+                len(password) < 8
                 or len(password) > 128
                 or password != getpass.getpass("Confirme a senha: ")
             ):

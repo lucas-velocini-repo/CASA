@@ -121,6 +121,13 @@ jobs:
                       if attempt == 29:
                           raise
                       time.sleep(1)
+          for path, method, payload in [('/api/devices/config', 'GET', None), ('/api/devices/config/report', 'POST', json.dumps({'revision':0,'interval_seconds':300,'firmware_version':'test'}).encode())]:
+              for host in ['localhost', '127.0.0.1']:
+                  try:
+                      opener.open(Request('http://127.0.0.1:18081' + path, method=method, data=payload, headers={'Host':host,'Content-Type':'application/json'}), timeout=5)
+                      raise AssertionError('Anonymous station configuration was accepted')
+                  except HTTPError as error:
+                      assert error.code == 401, (path, host, error.code)
           try:
               opener.open(Request('http://127.0.0.1:18081/', headers={'Host':'localhost'}), timeout=5)
               raise AssertionError('Website did not redirect to HTTPS')
