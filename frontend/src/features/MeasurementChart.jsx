@@ -15,7 +15,7 @@ import {
   automaticDomain,
   chartRows,
 } from "../utils/metrics";
-import { integerAxis, timeAxis } from "../utils/chartAxes";
+import { integerAxis } from "../utils/chartAxes";
 import { formatTimestamp } from "../utils/dates";
 import { exportChart } from "../utils/export";
 
@@ -37,7 +37,6 @@ export default function MeasurementChart({
   const valueAxis = integerAxis(
     zero ? [Math.min(0, domain[0]), Math.max(0, domain[1])] : domain,
   );
-  const dateAxis = timeAxis(data[0]?.time, data.at(-1)?.time);
   const hasData = rows.some((row) =>
     keys.some((key) => Number.isFinite(row.values?.[key])),
   );
@@ -107,9 +106,7 @@ export default function MeasurementChart({
                   dataKey="time"
                   type="number"
                   scale="time"
-                  domain={dateAxis?.domain ?? ["dataMin", "dataMax"]}
-                  ticks={dateAxis?.ticks}
-                  interval="equidistantPreserveStart"
+                  domain={["dataMin", "dataMax"]}
                   tickFormatter={(value) =>
                     formatTimestamp(value, true, timeZone)
                   }
