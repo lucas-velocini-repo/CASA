@@ -15,6 +15,7 @@ import {
   automaticDomain,
   chartRows,
 } from "../utils/metrics";
+import { integerAxis, timeAxis } from "../utils/chartAxes";
 import { formatTimestamp } from "../utils/dates";
 import { exportChart } from "../utils/export";
 
@@ -33,6 +34,10 @@ export default function MeasurementChart({
   const [zero, setZero] = useState(false);
   const data = useMemo(() => chartRows(rows, keys), [rows, keys]);
   const domain = useMemo(() => automaticDomain(rows, keys), [rows, keys]);
+  const valueAxis = integerAxis(
+    zero ? [Math.min(0, domain[0]), Math.max(0, domain[1])] : domain,
+  );
+  const dateAxis = timeAxis(data[0]?.time, data.at(-1)?.time);
   const hasData = rows.some((row) =>
     keys.some((key) => Number.isFinite(row.values?.[key])),
   );
@@ -102,7 +107,9 @@ export default function MeasurementChart({
                   dataKey="time"
                   type="number"
                   scale="time"
-                  domain={["dataMin", "dataMax"]}
+                  domain={dateAxis?.domain ?? ["dataMin", "dataMax"]}
+                  ticks={dateAxis?.ticks}
+                  interval="equidistantPreserveStart"
                   tickFormatter={(value) =>
                     formatTimestamp(value, true, timeZone)
                   }
@@ -112,13 +119,12 @@ export default function MeasurementChart({
                   tickLine={false}
                 />
                 <YAxis
-                  domain={
-                    zero
-                      ? [Math.min(0, domain[0]), Math.max(0, domain[1])]
-                      : domain
-                  }
+                  domain={valueAxis.domain}
+                  ticks={valueAxis.ticks}
+                  interval={0}
+                  allowDecimals={false}
                   width={65}
-                  tickFormatter={(value) => formatValue(value, 2)}
+                  tickFormatter={(value) => formatValue(value, 0)}
                   tick={{ fill: "#637c82", fontSize: 11 }}
                   axisLine={false}
                   tickLine={false}

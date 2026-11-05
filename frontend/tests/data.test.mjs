@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { periodBounds, today } from "../src/utils/dates.js";
 import { fetchHistory } from "../src/services/api.js";
 import { automaticDomain, chartRows } from "../src/utils/metrics.js";
+import { integerAxis, timeAxis } from "../src/utils/chartAxes.js";
 import { makeCsv } from "../src/utils/export.js";
 const period = {
   startDate: "2026-09-19",
@@ -122,6 +123,26 @@ test("pressure axis shows small variation, constant and zero values remain valid
     automaticDomain([{ values: { light: 0 } }], ["light"]),
     [-0.01, 0.01],
   );
+});
+test("value axis has evenly spaced integer ticks and contains decimal readings", () => {
+  assert.deepEqual(integerAxis([948.55, 948.86]), {
+    domain: [948, 949],
+    ticks: [948, 949],
+  });
+  assert.deepEqual(integerAxis([-2.3, 14.7]), {
+    domain: [-5, 15],
+    ticks: [-5, 0, 5, 10, 15],
+  });
+  assert.deepEqual(integerAxis([0, 0]), { domain: [0, 1], ticks: [0, 1] });
+});
+test("time axis aligns to regularly spaced whole minutes around the data", () => {
+  const start = Date.parse("2026-11-05T12:00:00Z");
+  const minute = 60_000;
+  assert.deepEqual(timeAxis(start + 3 * minute, start + 42 * minute), {
+    domain: [start, start + 50 * minute],
+    ticks: [0, 10, 20, 30, 40, 50].map((offset) => start + offset * minute),
+  });
+  assert.deepEqual(timeAxis(start, start).ticks, [start, start + minute]);
 });
 test("visual reduction keeps extrema and does not change source records", () => {
   const rows = Array.from({ length: 10000 }, (_, i) => ({

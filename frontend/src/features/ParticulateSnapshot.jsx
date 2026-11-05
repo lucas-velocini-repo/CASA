@@ -9,6 +9,7 @@ import {
   Cell,
 } from "recharts";
 import { metrics, formatValue, PM_KEYS } from "../utils/metrics";
+import { integerAxis } from "../utils/chartAxes";
 import { formatTimestamp } from "../utils/dates";
 
 export default function ParticulateSnapshot({ reading, timeZone }) {
@@ -17,7 +18,9 @@ export default function ParticulateSnapshot({ reading, timeZone }) {
     name: metrics[key].label,
     value: reading.values?.[key] ?? null,
   }));
-  const hasData = data.some((item) => Number.isFinite(item.value));
+  const values = data.map(({ value }) => value).filter(Number.isFinite);
+  const hasData = values.length > 0;
+  const valueAxis = integerAxis([Math.min(0, ...values), Math.max(0, ...values)]);
   return (
     <section className="chart-card particulate-snapshot">
       <div className="chart-heading">
@@ -53,8 +56,12 @@ export default function ParticulateSnapshot({ reading, timeZone }) {
                   tickLine={false}
                 />
                 <YAxis
+                  domain={valueAxis.domain}
+                  ticks={valueAxis.ticks}
+                  interval={0}
+                  allowDecimals={false}
                   width={60}
-                  tickFormatter={(value) => formatValue(value, 2)}
+                  tickFormatter={(value) => formatValue(value, 0)}
                   tick={{ fill: "#637c82", fontSize: 11 }}
                   axisLine={false}
                   tickLine={false}
