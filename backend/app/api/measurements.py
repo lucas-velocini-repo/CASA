@@ -27,6 +27,8 @@ from app.services.measurement_service import (
     get_latest_measurements,
     get_measurement_history,
 )
+from app.api.dependencies import current_user
+from app.models.accounts import User
 
 router = APIRouter(
     prefix="/measurements",
@@ -95,6 +97,7 @@ def receive_measurement(
 )
 def measurement_history(
     device_id: str,
+    user: User = Depends(current_user),
     start: datetime | None = None,
     end: datetime | None = None,
     limit: int = Query(
@@ -110,6 +113,7 @@ def measurement_history(
         start=start,
         end=end,
         limit=limit,
+        user=user,
     )
 
 
@@ -118,6 +122,7 @@ def measurement_history(
     response_model=list[MeasurementDataResponse],
 )
 def latest_measurements(
+    user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
-    return get_latest_measurements(db)
+    return get_latest_measurements(db, user)

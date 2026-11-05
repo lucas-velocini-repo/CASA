@@ -18,6 +18,11 @@ from app.services.device_location_service import update_device_location
 from app.services.device_service import (
     register_device,
 )
+from app.api.dependencies import admin_user, current_user
+from app.models.accounts import Provisioning, User
+from app.services.access_service import device_scope, visible_device
+from app.services.account_service import audit
+from app.core.security import utcnow
 
 router = APIRouter(
     prefix="/devices",
@@ -54,6 +59,7 @@ def receive_device_location(
 )
 def create_device(
     device_data: DeviceCreate,
+    actor: User = Depends(admin_user),
     db: Session = Depends(get_db),
 ):
     existing_device = db.scalar(
@@ -75,6 +81,7 @@ def create_device(
     )
 
     db.add(device)
+    audit(db, actor, "station.created", device.device_id)
     db.commit()
     db.refresh(device)
 
@@ -86,11 +93,12 @@ def create_device(
     response_model=list[DeviceResponse],
 )
 def list_devices(
+    user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
-    devices = db.scalars(select(Device)).all()
+    devices = db.scalars(select(Device).where(device_scope(user)).order_by(Device.id)).all()
 
-    return devices
+    return [visible_device(db, user, device) for device in devices]
 
 
 @router.post(
@@ -100,6 +108,7 @@ def list_devices(
 )
 def register_new_device(
     data: DeviceRegisterRequest,
+    actor: User = Depends(admin_user),
     db: Session = Depends(get_db),
 ):
     device, api_token = register_device(
@@ -108,6 +117,7 @@ def register_new_device(
         name=data.name,
         latitude=data.latitude,
         longitude=data.longitude,
+        actor=actor,
     )
 
     return DeviceRegisterResponse(
@@ -116,3 +126,16 @@ def register_new_device(
         name=device.name,
         api_token=api_token,
     )
+
+
+@router.post("/{device_id}/provisioning/confirm")
+def confirm_provisioning(device_id: str, actor: User = Depends(admin_user), db: Session = Depends(get_db)):
+    device = db.scalar(select(Device).where(Device.device_id == device_id))
+    if not device:
+        raise HTTPException(404, "Estação não encontrada.")
+    pending = db.scalar(select(Provisioning).where(Provisioning.device_id == device.id).with_for_update())
+    if pending and not pending.confirmed_at:
+        pending.confirmed_at, pending.encrypted_token = utcnow(), None
+        audit(db, actor, "station.provisioning.confirmed", device_id)
+        db.commit()
+    return {"message": "Provisionamento confirmado."}

@@ -58,6 +58,7 @@ class DeviceResponse(BaseModel):
     location_updated_at: datetime | None = None
 
     firmware_version: str | None
+    measurement_interval_seconds: int | None = None
     active: bool
 
     created_at: datetime
@@ -65,8 +66,9 @@ class DeviceResponse(BaseModel):
 
 
 class DeviceRegisterRequest(BaseModel):
-    hardware_id: str
-    name: str
+    model_config = ConfigDict(extra="forbid")
+    hardware_id: str = Field(min_length=1, max_length=32, pattern=r"^[A-Za-z0-9:_-]+$")
+    name: str = Field(min_length=1, max_length=100)
     latitude: float | None = Field(
         default=None,
         ge=-90,

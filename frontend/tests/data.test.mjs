@@ -184,3 +184,14 @@ test("CSV exports only the tab metrics while history includes every metric", asy
   assert.deepEqual(exportKeys("history"), Object.keys(metrics));
   assert.ok(exportKeys("overview").includes("pm10"));
 });
+
+
+test("station activity follows confirmed long acquisition intervals", async () => {
+  const { isStationActive } = await import("../src/utils/stationStatus.js");
+  const now = Date.now();
+  const ago = (seconds) => new Date(now - seconds * 1000).toISOString();
+  assert.equal(isStationActive(ago(600), now, 900), true);
+  assert.equal(isStationActive(ago(1081), now, 900), false);
+  assert.equal(isStationActive(ago(361), now, 30), false);
+  assert.equal(isStationActive(ago(361), now, null), false);
+});

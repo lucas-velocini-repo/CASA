@@ -9,7 +9,8 @@ test("GPS details appear in the header and cards keep only coordinates", async (
   const server = await createServer({
     configFile: false,
     plugins: [react()],
-    server: { middlewareMode: true },
+    server: { middlewareMode: true, hmr: false, ws: false },
+    optimizeDeps: { noDiscovery: true, entries: [] },
   });
   try {
     const { default: StationSelector } = await server.ssrLoadModule(

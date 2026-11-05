@@ -1,16 +1,8 @@
+import { apiRequest } from "./session.js";
 const PAGE_SIZE = 1000;
 
 export async function fetchJson(path, signal) {
-  const base = (import.meta.env?.VITE_API_BASE_URL || "/api").replace(
-    /\/$/,
-    "",
-  );
-  const response = await fetch(`${base}${path}`, { signal });
-  if (!response.ok)
-    throw new Error(
-      `Não foi possível consultar o servidor (HTTP ${response.status}).`,
-    );
-  const data = await response.json();
+  const data = await apiRequest(path, { signal });
   if (!Array.isArray(data))
     throw new Error("O servidor retornou um formato de dados inesperado.");
   return data;

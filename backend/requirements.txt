@@ -1,6 +1,10 @@
-fastapi
-uvicorn[standard]
-sqlalchemy
-psycopg[binary]
-python-dotenv
-alembic
+fastapi==0.162.0
+uvicorn[standard]==0.54.0
+sqlalchemy==2.1.6
+psycopg[binary]==3.3.6
+python-dotenv==1.2.4
+alembic==1.20.1
+pwdlib[argon2]==0.3.1
+pyotp==2.10.0
+cryptography==50.0.2
+email-validator==2.3.0

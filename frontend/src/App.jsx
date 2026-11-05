@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
-import { Download, RefreshCw, UserRound, Settings } from "lucide-react";
+import { Download, RefreshCw, Settings, LogOut, ShieldCheck, LayoutDashboard } from "lucide-react";
+import AdminPanel from "./features/AdminPanel";
 import SettingsDialog from "./components/SettingsDialog";
 import { readTimeZone } from "./utils/settings";
 import logo from "../assets/t2p-logo.png";
@@ -123,7 +124,8 @@ function StationData({ device, latest, timeZone }) {
   );
 }
 
-export default function App() {
+export default function App({ user, onLogout }) {
+  const [adminOpen, setAdminOpen] = useState(false);
   const [timeZone, setTimeZone] = useState(readTimeZone);
   const [settingsOpen, setSettingsOpen] = useState(false);
   function saveTimeZone(value) {
@@ -147,13 +149,6 @@ export default function App() {
     <div className="app-shell">
       <header className="topbar">
         <div className="brand-group">
-          <span
-            className="account-placeholder"
-            title="Acesso de usuários previsto para a V3"
-            aria-label="Acesso de usuários previsto para a V3"
-          >
-            <UserRound size={19} />
-          </span>
           <a
             href="#main"
             className="brand"
@@ -166,8 +161,9 @@ export default function App() {
             />
           </a>
         </div>
-        <span className="topbar-title">Interface de monitoramento</span>
         <div className="header-actions">
+          <span className="account-name" title={user.email}>{user.name}</span>
+          {user.role === "admin" && <button className="account-nav" aria-pressed={adminOpen} onClick={() => setAdminOpen(v => !v)}>{adminOpen ? <LayoutDashboard size={17} /> : <ShieldCheck size={17} />}{adminOpen ? "Monitoramento" : "Administração"}</button>}
           <span className="project-badge">CASA</span>
           <button
             aria-label="Configurações"
@@ -176,10 +172,11 @@ export default function App() {
           >
             <Settings size={19} />
           </button>
+          <button aria-label="Sair da conta" title="Sair da conta" onClick={onLogout}><LogOut size={19} /></button>
         </div>
       </header>
       <div className="main-layout" id="main">
-        {stations.status !== "success" ? (
+        {adminOpen ? <AdminPanel currentUser={user} devices={devices} onChange={() => setRevision(v => v + 1)} /> : stations.status !== "success" ? (
           <div className="global-status">
             <StatusPanel
               status={stations.status}
@@ -191,8 +188,8 @@ export default function App() {
           <div className="global-status">
             <StatusPanel
               status="success"
-              emptyTitle="Nenhuma estação cadastrada"
-              emptyText="As estações aparecerão aqui quando forem cadastradas no servidor."
+              emptyTitle={user.role === "admin" ? "Nenhuma estação cadastrada" : "Nenhuma estação vinculada"}
+              emptyText={user.role === "admin" ? "Cadastre uma estação pelo aplicativo de configuração." : "A equipe do projeto pode vincular as estações à sua conta."}
             />
           </div>
         ) : (
