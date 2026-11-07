@@ -11,6 +11,7 @@ import StatusPanel from "./components/StatusPanel";
 import Overview from "./features/Overview";
 import HistoryTable from "./features/HistoryTable";
 import MeasurementChart from "./features/MeasurementChart";
+import ParticulateDayChart from "./features/ParticulateDayChart";
 import { usePolling } from "./hooks/usePolling";
 import { fetchHistory, fetchStations } from "./services/api";
 import { tabs, exportKeys } from "./utils/metrics";
@@ -109,15 +110,22 @@ function StationData({ device, latest, timeZone }) {
             timeZone={timeZone}
           />
         ) : (
-          <MeasurementChart
-            key={tab}
-            rows={rows}
-            keys={definition.keys}
-            title={definition.label}
-            station={name}
-            period={label}
-            timeZone={timeZone}
-          />
+          <>
+            <MeasurementChart
+              key={tab}
+              rows={rows}
+              keys={definition.keys}
+              title={definition.label}
+              station={name}
+              period={label}
+              timeZone={timeZone}
+            />
+            {(tab === "pm" || tab === "nc") && (
+              <div className="particulate-tab-day">
+                <ParticulateDayChart rows={rows} timeZone={timeZone} kind={tab.toUpperCase()} />
+              </div>
+            )}
+          </>
         )}
       </div>
     </main>

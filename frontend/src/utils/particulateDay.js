@@ -1,6 +1,6 @@
 import { particulateBands } from "./metrics.js";
 
-export function latestParticulateDay(rows, timeZone) {
+export function latestParticulateDay(rows, timeZone, keys) {
   if (!rows.length) return { date: "", readings: [], max: 0, hasMissing: false };
   const dateFormat = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone });
   const date = dateFormat.format(rows.at(-1).time);
@@ -10,7 +10,7 @@ export function latestParticulateDay(rows, timeZone) {
   let max = 0;
   let hasMissing = false;
   const readings = rows.slice(start).map((row) => {
-    const bands = particulateBands(row.values);
+    const bands = particulateBands(row.values, keys);
     const complete = bands.every(({ difference }) => difference !== null);
     if (complete) max = Math.max(max, bands.at(-1).value);
     else hasMissing = true;

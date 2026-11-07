@@ -8,6 +8,7 @@ import {
   formatValue,
   particulateBands,
   formatParticulateDifference,
+  NC_KEYS,
 } from "../src/utils/metrics.js";
 import { integerAxis } from "../src/utils/chartAxes.js";
 import { latestParticulateDay } from "../src/utils/particulateDay.js";
@@ -169,6 +170,19 @@ test("daily PM columns keep the last local day and distinguish incomplete readin
   assert.deepEqual(day.readings.map(({ id, complete }) => [id, complete]), [[1, true], [2, true], [3, false]]);
   assert.deepEqual(day.readings[1].bands.map(({ difference }) => difference), [3, 2, 0, 3]);
   assert.equal(latestParticulateDay(rows, "UTC").readings.length, 4);
+});
+test("daily NC columns stack five adjacent differences and scale to NC 10,0", () => {
+  const time = Date.parse("2026-09-20T03:00:00Z");
+  const values = { nc05: 21, nc10: 30, nc25: 34, nc40: 34, nc100: 36 };
+  const rows = [
+    { measurement_id: 1, time, values },
+    { measurement_id: 2, time: time + 60_000, values: { ...values, nc40: 33, nc100: 90 } },
+  ];
+  const { max, readings } = latestParticulateDay(rows, "UTC", NC_KEYS);
+  assert.equal(max, 36);
+  assert.equal(readings[0].complete, true);
+  assert.deepEqual(readings[0].bands.map(({ difference }) => difference), [21, 9, 4, 0, 2]);
+  assert.equal(readings[1].complete, false);
 });
 test("value axis has evenly spaced integer ticks and contains decimal readings", () => {
   assert.deepEqual(integerAxis([948.55, 948.86]), {

@@ -2,18 +2,18 @@ import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ChevronFirst, ChevronLast } from "lucide-react";
 import { integerAxis } from "../utils/chartAxes";
 import { formatTimestamp } from "../utils/dates";
-import { formatValue, metrics, PM_KEYS } from "../utils/metrics";
+import { formatValue, metrics, NC_KEYS, PM_KEYS } from "../utils/metrics";
 import { latestParticulateDay } from "../utils/particulateDay";
 
 const COLUMN_WIDTH = 32;
 const AXIS_WIDTH = 52;
 const OVERSCAN = 3;
 
-function ReadingDetails({ reading, timeZone, left }) {
+function ReadingDetails({ reading, timeZone, unit, left }) {
   return (
     <div className={`pm-day-tooltip ${left ? "pm-day-tooltip-left" : ""}`} role="status">
       <strong>{formatTimestamp(reading.time, false, timeZone, true)}</strong>
-      <small>Concentração acumulada · µg/m³</small>
+      <small>Concentração acumulada · {unit}</small>
       <dl>
         {reading.bands.map(({ key, value }) => (
           <div key={key}>
@@ -27,7 +27,7 @@ function ReadingDetails({ reading, timeZone, left }) {
   );
 }
 
-function ScrollableReadings({ readings, max, timeZone }) {
+function ScrollableReadings({ readings, max, timeZone, kind, seriesKeys, unit }) {
   const scrollRef = useRef(null);
   const followLatest = useRef(true);
   const previousReadings = useRef(readings);
@@ -123,7 +123,7 @@ function ScrollableReadings({ readings, max, timeZone }) {
           id={scrollId}
           tabIndex={0}
           role="region"
-          aria-label="Medições de particulados PM em ordem cronológica"
+          aria-label={`Medições de particulados ${kind} em ordem cronológica`}
           aria-describedby={hintId}
           onScroll={onScroll}
           onKeyDown={onKeyDown}
@@ -175,6 +175,7 @@ function ScrollableReadings({ readings, max, timeZone }) {
           <ReadingDetails
             reading={readings[active]}
             timeZone={timeZone}
+            unit={unit}
             left={active * COLUMN_WIDTH - viewport.left >= plotWidth / 2}
           />
         )}
@@ -188,7 +189,7 @@ function ScrollableReadings({ readings, max, timeZone }) {
         </button>
       </div>
       <div className="chart-legend">
-        {PM_KEYS.map((key) => (
+        {seriesKeys.map((key) => (
           <span key={key}><i style={{ background: metrics[key].color }} />{metrics[key].label}</span>
         ))}
       </div>
@@ -199,26 +200,36 @@ function ScrollableReadings({ readings, max, timeZone }) {
   );
 }
 
-export default function ParticulateDayChart({ rows, timeZone }) {
+export default function ParticulateDayChart({ rows, timeZone, kind = "PM" }) {
+  const seriesKeys = kind === "NC" ? NC_KEYS : PM_KEYS;
+  const unit = metrics[seriesKeys[0]].unit;
   const { date, readings, max, hasMissing } = useMemo(
-    () => latestParticulateDay(rows, timeZone),
-    [rows, timeZone],
+    () => latestParticulateDay(rows, timeZone, seriesKeys),
+    [rows, timeZone, seriesKeys],
   );
   return (
     <section className="chart-card pm-day-card">
       <div className="chart-heading">
         <div>
-          <h3>Particulados PM por leitura</h3>
-          <small>{date} · µg/m³ · {readings.length.toLocaleString("pt-BR")} leituras</small>
+          <h3>Particulados {kind} por leitura</h3>
+          <small>{date} · {unit} · {readings.length.toLocaleString("pt-BR")} leituras</small>
         </div>
       </div>
       {readings.some(({ complete }) => complete) ? (
         <>
-          <ScrollableReadings key={date} readings={readings} max={max} timeZone={timeZone} />
+          <ScrollableReadings
+            key={`${kind}:${date}`}
+            readings={readings}
+            max={max}
+            timeZone={timeZone}
+            kind={kind}
+            seriesKeys={seriesKeys}
+            unit={unit}
+          />
           {hasMissing && <p className="chart-note">Leituras com dados incompletos ou inconsistentes aparecem sem barra.</p>}
         </>
       ) : (
-        <div className="metric-empty">Não há leituras de PM com valores completos e cumulativos neste dia.</div>
+        <div className="metric-empty">Não há leituras de {kind} com valores completos e cumulativos neste dia.</div>
       )}
     </section>
   );

@@ -23,18 +23,17 @@ export const metrics = {
   },
 };
 
+export const PM_KEYS = ["pm1", "pm25", "pm4", "pm10"];
+export const NC_KEYS = ["nc05", "nc10", "nc25", "nc40", "nc100"];
+
 export const tabs = [
   { id: "overview", label: "Visão geral" },
   { id: "temperature", label: "Temperatura", keys: ["temperature"] },
   { id: "pressure", label: "Pressão", keys: ["pressure"] },
   { id: "humidity", label: "Umidade", keys: ["humidity"] },
   { id: "light", label: "Luminosidade", keys: ["light"] },
-  { id: "pm", label: "Particulados PM", keys: ["pm1", "pm25", "pm4", "pm10"] },
-  {
-    id: "nc",
-    label: "Particulados NC",
-    keys: ["nc05", "nc10", "nc25", "nc40", "nc100"],
-  },
+  { id: "pm", label: "Particulados PM", keys: PM_KEYS },
+  { id: "nc", label: "Particulados NC", keys: NC_KEYS },
   { id: "history", label: "Dados históricos" },
 ];
 
@@ -96,12 +95,10 @@ export function chartRows(rows, keys, budget = 1800) {
   return [...indexes].sort((a, b) => a - b).map((i) => rows[i]);
 }
 
-export const PM_KEYS = ["pm1", "pm25", "pm4", "pm10"];
-
-export function particulateBands(values) {
-  return PM_KEYS.map((key, index) => {
+export function particulateBands(values, keys = PM_KEYS) {
+  return keys.map((key, index) => {
     const value = values?.[key];
-    const previous = index === 0 ? 0 : values?.[PM_KEYS[index - 1]];
+    const previous = index === 0 ? 0 : values?.[keys[index - 1]];
     const difference =
       Number.isFinite(value) && Number.isFinite(previous) && previous >= 0 && value >= previous
         ? value - previous

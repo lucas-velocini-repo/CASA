@@ -1184,7 +1184,8 @@ tbody tr:nth-child(even) {
   font-size: 11px;
   font-weight: 400;
 }
-.overview-pm-history {
+.overview-pm-history,
+.particulate-tab-day {
   margin-top: 20px;
 }
 .pm-day-card {
