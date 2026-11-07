@@ -4,7 +4,7 @@ import { integerAxis } from "../utils/chartAxes";
 import { formatTimestamp } from "../utils/dates";
 import { exportParticulateChart } from "../utils/export";
 import { formatValue, metrics, NC_KEYS, PM_KEYS } from "../utils/metrics";
-import { latestParticulateDay, particulateReadingMax } from "../utils/particulateDay";
+import { latestParticulateDay, particulatePeriodMax, particulateReadingMax } from "../utils/particulateDay";
 
 const COLUMN_WIDTH = 32;
 const AXIS_WIDTH = 52;
@@ -234,7 +234,7 @@ export default function ParticulateDayChart({ rows, station, timeZone, kind = "P
   const scrollRef = useRef(null);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState("");
-  const [fixedDayScale, setFixedDayScale] = useState(false);
+  const [fixedPeriodScale, setFixedPeriodScale] = useState(false);
   const [scaleRange, setScaleRange] = useState(null);
   const seriesKeys = kind === "NC" ? NC_KEYS : PM_KEYS;
   const unit = metrics[seriesKeys[0]].unit;
@@ -243,9 +243,13 @@ export default function ParticulateDayChart({ rows, station, timeZone, kind = "P
     () => latestParticulateDay(rows, timeZone, seriesKeys),
     [rows, timeZone, seriesKeys],
   );
-  const scaleMax = fixedDayScale || !scaleRange
-    ? max
-    : particulateReadingMax(readings.slice(scaleRange.start, scaleRange.end));
+  const periodMax = useMemo(
+    () => fixedPeriodScale ? particulatePeriodMax(rows, seriesKeys) : null,
+    [fixedPeriodScale, rows, seriesKeys],
+  );
+  const scaleMax = periodMax ?? (scaleRange
+    ? particulateReadingMax(readings.slice(scaleRange.start, scaleRange.end))
+    : max);
   const axis = integerAxis([0, scaleMax]);
   const hasData = readings.some(({ complete }) => complete);
 
@@ -307,10 +311,10 @@ export default function ParticulateDayChart({ rows, station, timeZone, kind = "P
             <label className="checkbox">
               <input
                 type="checkbox"
-                checked={fixedDayScale}
-                onChange={(event) => setFixedDayScale(event.target.checked)}
+                checked={fixedPeriodScale}
+                onChange={(event) => setFixedPeriodScale(event.target.checked)}
               />
-              Fixar escala do dia
+              Fixar escala do período
             </label>
           </ScrollableReadings>
           {hasMissing && <p className="chart-note">Leituras com dados incompletos ou inconsistentes aparecem sem barra.</p>}

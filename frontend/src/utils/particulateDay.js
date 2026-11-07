@@ -7,6 +7,19 @@ export function particulateReadingMax(readings) {
   );
 }
 
+export function particulatePeriodMax(rows, keys) {
+  const totalKey = keys.at(-1);
+  let max = 0;
+  for (const { values } of rows) {
+    const total = values?.[totalKey];
+    if (Number.isFinite(total) && total > max &&
+      particulateBands(values, keys).every(({ difference }) => difference !== null)) {
+      max = total;
+    }
+  }
+  return max;
+}
+
 export function latestParticulateDay(rows, timeZone, keys) {
   if (!rows.length) return { date: "", readings: [], max: 0, hasMissing: false };
   const dateFormat = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone });

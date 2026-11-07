@@ -9,9 +9,10 @@ import {
   particulateBands,
   formatParticulateDifference,
   NC_KEYS,
+  PM_KEYS,
 } from "../src/utils/metrics.js";
 import { integerAxis } from "../src/utils/chartAxes.js";
-import { latestParticulateDay, particulateReadingMax } from "../src/utils/particulateDay.js";
+import { latestParticulateDay, particulatePeriodMax, particulateReadingMax } from "../src/utils/particulateDay.js";
 import { makeCsv } from "../src/utils/export.js";
 const period = {
   startDate: "2026-09-19",
@@ -196,6 +197,17 @@ test("the visible PM scale excludes older peaks and incomplete readings", () => 
   assert.equal(day.max, 100);
   assert.deepEqual(integerAxis([0, particulateReadingMax(day.readings.slice(1))]).domain, [0, 15]);
   assert.deepEqual(integerAxis([0, particulateReadingMax(day.readings.slice(2))]).domain, [0, 1]);
+});
+test("fixed particulate scales include prior days in the filtered period", () => {
+  const rows = [
+    ["2026-09-19T12:00:00Z", { pm1: 30, pm25: 50, pm4: 70, pm10: 100, nc05: 100, nc10: 150, nc25: 200, nc40: 220, nc100: 250 }],
+    ["2026-09-19T13:00:00Z", { pm10: 1000, nc05: 900, nc10: 800, nc25: 900, nc40: 1000, nc100: 1100 }],
+    ["2026-09-20T12:00:00Z", { pm1: 3, pm25: 5, pm4: 8, pm10: 12, nc05: 15, nc10: 20, nc25: 25, nc40: 28, nc100: 34 }],
+  ].map(([timestamp, values], measurement_id) => ({ measurement_id, time: Date.parse(timestamp), values }));
+  assert.equal(latestParticulateDay(rows, "UTC", PM_KEYS).max, 12);
+  assert.equal(latestParticulateDay(rows, "UTC", NC_KEYS).max, 34);
+  assert.equal(particulatePeriodMax(rows, PM_KEYS), 100);
+  assert.equal(particulatePeriodMax(rows, NC_KEYS), 250);
 });
 test("value axis has evenly spaced integer ticks and contains decimal readings", () => {
   assert.deepEqual(integerAxis([948.55, 948.86]), {
