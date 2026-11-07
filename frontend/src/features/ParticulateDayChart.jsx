@@ -1,14 +1,15 @@
-import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ChevronFirst, ChevronLast, Download } from "lucide-react";
 import { integerAxis } from "../utils/chartAxes";
 import { formatTimestamp } from "../utils/dates";
 import { exportParticulateChart } from "../utils/export";
 import { formatValue, metrics, NC_KEYS, PM_KEYS } from "../utils/metrics";
-import { latestParticulateDay } from "../utils/particulateDay";
+import { latestParticulateDay, particulateReadingMax } from "../utils/particulateDay";
 
 const COLUMN_WIDTH = 32;
 const AXIS_WIDTH = 52;
 const OVERSCAN = 3;
+const SCALE_SETTLE_MS = 160;
 
 function visibleReadingRange(left, width) {
   const plotWidth = Math.max(0, width - AXIS_WIDTH);
@@ -37,9 +38,12 @@ function ReadingDetails({ reading, timeZone, unit, left }) {
   );
 }
 
-function ScrollableReadings({ readings, axis, timeZone, kind, seriesKeys, unit, scrollRef }) {
+function ScrollableReadings({
+  readings, axis, timeZone, kind, seriesKeys, unit, scrollRef, setScaleRange, children,
+}) {
   const followLatest = useRef(true);
   const previousReadings = useRef(readings);
+  const scaleTimer = useRef(null);
   const [viewport, setViewport] = useState({ left: 0, width: 0 });
   const [activeId, setActiveId] = useState(null);
   const scrollId = useId();
@@ -49,12 +53,22 @@ function ScrollableReadings({ readings, axis, timeZone, kind, seriesKeys, unit, 
     [timeZone],
   );
 
-  function updateViewport(element) {
+  const updateViewport = useCallback((element, scrolling = false) => {
     const { scrollLeft: left, clientWidth: width } = element;
     setViewport((previous) =>
       previous.left === left && previous.width === width ? previous : { left, width },
     );
-  }
+    clearTimeout(scaleTimer.current);
+    const { start, end } = visibleReadingRange(left, width);
+    const settleScale = () => {
+      scaleTimer.current = null;
+      setScaleRange((previous) =>
+        previous?.start === start && previous.end === end ? previous : { start, end },
+      );
+    };
+    if (scrolling) scaleTimer.current = setTimeout(settleScale, SCALE_SETTLE_MS);
+    else settleScale();
+  }, [setScaleRange]);
 
   useLayoutEffect(() => {
     const element = scrollRef.current;
@@ -68,23 +82,27 @@ function ScrollableReadings({ readings, axis, timeZone, kind, seriesKeys, unit, 
       if (anchor >= 0) element.scrollLeft += (anchor - first) * COLUMN_WIDTH;
     }
     previousReadings.current = readings;
-    updateViewport(element);
-  }, [readings, scrollRef]);
+    updateViewport(element, scaleTimer.current !== null);
+  }, [readings, scrollRef, updateViewport]);
 
   useLayoutEffect(() => {
     const element = scrollRef.current;
     const observer = new ResizeObserver(() => {
       if (followLatest.current) element.scrollLeft = element.scrollWidth;
-      updateViewport(element);
+      updateViewport(element, scaleTimer.current !== null);
     });
     observer.observe(element);
-    return () => observer.disconnect();
-  }, [scrollRef]);
+    return () => {
+      observer.disconnect();
+      clearTimeout(scaleTimer.current);
+      scaleTimer.current = null;
+    };
+  }, [scrollRef, updateViewport]);
 
   function onScroll(event) {
     const element = event.currentTarget;
     followLatest.current = element.scrollWidth - element.clientWidth - element.scrollLeft <= 2;
-    updateViewport(element);
+    updateViewport(element, true);
   }
 
   const last = readings.length - 1;
@@ -197,10 +215,13 @@ function ScrollableReadings({ readings, axis, timeZone, kind, seriesKeys, unit, 
           Ir para a última leitura <ChevronLast size={16} aria-hidden="true" />
         </button>
       </div>
-      <div className="chart-legend">
-        {seriesKeys.map((key) => (
-          <span key={key}><i style={{ background: metrics[key].color }} />{metrics[key].label}</span>
-        ))}
+      <div className="chart-footer">
+        <div className="chart-legend">
+          {seriesKeys.map((key) => (
+            <span key={key}><i style={{ background: metrics[key].color }} />{metrics[key].label}</span>
+          ))}
+        </div>
+        {children}
       </div>
       <p className="chart-note" id={hintId}>
         Role para ver outras leituras. Use as setas do teclado ou toque em uma barra para ver os valores.
@@ -213,6 +234,8 @@ export default function ParticulateDayChart({ rows, station, timeZone, kind = "P
   const scrollRef = useRef(null);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState("");
+  const [fixedDayScale, setFixedDayScale] = useState(false);
+  const [scaleRange, setScaleRange] = useState(null);
   const seriesKeys = kind === "NC" ? NC_KEYS : PM_KEYS;
   const unit = metrics[seriesKeys[0]].unit;
   const title = `Particulados ${kind} por leitura`;
@@ -220,7 +243,10 @@ export default function ParticulateDayChart({ rows, station, timeZone, kind = "P
     () => latestParticulateDay(rows, timeZone, seriesKeys),
     [rows, timeZone, seriesKeys],
   );
-  const axis = integerAxis([0, max]);
+  const scaleMax = fixedDayScale || !scaleRange
+    ? max
+    : particulateReadingMax(readings.slice(scaleRange.start, scaleRange.end));
+  const axis = integerAxis([0, scaleMax]);
   const hasData = readings.some(({ complete }) => complete);
 
   async function save() {
@@ -276,7 +302,17 @@ export default function ParticulateDayChart({ rows, station, timeZone, kind = "P
             seriesKeys={seriesKeys}
             unit={unit}
             scrollRef={scrollRef}
-          />
+            setScaleRange={setScaleRange}
+          >
+            <label className="checkbox">
+              <input
+                type="checkbox"
+                checked={fixedDayScale}
+                onChange={(event) => setFixedDayScale(event.target.checked)}
+              />
+              Fixar escala do dia
+            </label>
+          </ScrollableReadings>
           {hasMissing && <p className="chart-note">Leituras com dados incompletos ou inconsistentes aparecem sem barra.</p>}
         </>
       ) : (

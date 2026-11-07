@@ -1259,6 +1259,7 @@ tbody tr:nth-child(even) {
   inset: 0 5px;
   display: flex;
   flex-direction: column-reverse;
+  overflow: hidden;
 }
 .pm-day-stack i {
   flex: none;

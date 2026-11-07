@@ -126,6 +126,7 @@ export async function exportParticulateChart({
   const right = width - 24;
   const bottom = 464;
   const plotHeight = 328;
+  const top = bottom - plotHeight;
   const scale = plotHeight / axis.domain[1];
   context.fillStyle = "#536b73";
   context.strokeStyle = "#dce8e5";
@@ -152,7 +153,8 @@ export async function exportParticulateChart({
     if (complete) {
       let y = bottom;
       for (const { key, difference } of bands) {
-        const bandHeight = difference * scale;
+        if (y <= top) break;
+        const bandHeight = Math.min(difference * scale, y - top);
         y -= bandHeight;
         context.fillStyle = metrics[key].color;
         context.fillRect(x - barWidth / 2, y, barWidth, bandHeight);

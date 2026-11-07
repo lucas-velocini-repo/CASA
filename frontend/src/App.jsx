@@ -122,7 +122,7 @@ function StationData({ device, latest, timeZone }) {
             />
             {(tab === "pm" || tab === "nc") && (
               <div className="particulate-tab-day">
-                <ParticulateDayChart rows={rows} station={name} timeZone={timeZone} kind={tab.toUpperCase()} />
+                <ParticulateDayChart key={tab} rows={rows} station={name} timeZone={timeZone} kind={tab.toUpperCase()} />
               </div>
             )}
           </>
