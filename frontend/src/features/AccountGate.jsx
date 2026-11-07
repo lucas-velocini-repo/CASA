@@ -46,7 +46,6 @@ function LoginPassword() {
       <button
         type="button"
         aria-label={action}
-        title={action}
         aria-controls="login-password"
         onClick={() => setVisible((value) => !value)}
       >

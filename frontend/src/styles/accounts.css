@@ -98,14 +98,20 @@
   place-items: center;
   width: 38px;
   height: 35px;
+  min-height: 0;
   padding: 0;
   background: transparent;
   border-color: transparent;
   color: #52677c;
 }
-.account-password button:hover {
-  background: #f1f6fb;
+.account-password button:hover:not(:disabled) {
+  background: transparent;
+  border-color: transparent;
   color: #17324b;
+}
+.account-password button:focus-visible {
+  outline: 2px solid #16aaa4;
+  outline-offset: -3px;
 }
 .account-card .account-link {
   display: block;

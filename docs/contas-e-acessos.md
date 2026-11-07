@@ -30,7 +30,7 @@ Para executar o teste e a implantação com comandos completos, siga o [roteiro 
 
 Senhas usam Argon2id com `pwdlib`. Tokens de sessão e de convite/recuperação são aleatórios e armazenados por SHA-256; esse hash rápido é apropriado para tokens de alta entropia, e não é usado para senhas.
 
-Sessões web duram 12 horas, com cookie `__Host-casa_session` (HttpOnly, Secure, SameSite=Lax). Requisições de escrita pelo navegador exigem origem exata e token CSRF. Sessões mobile duram 7 dias e usam Bearer token guardado em Expo SecureStore; não são aceitas como cookies web. Não há renovação silenciosa nesta versão: após expirar, a pessoa entra novamente. Sessões são revogadas em logout, bloqueio, alteração de perfil e recuperação de senha.
+Sessões web duram 14 dias, com cookie `__Host-casa_session` (HttpOnly, Secure, SameSite=Lax). Requisições de escrita pelo navegador exigem origem exata e token CSRF. Sessões mobile duram 7 dias e usam Bearer token guardado em Expo SecureStore; não são aceitas como cookies web. Não há renovação silenciosa nesta versão: após expirar, a pessoa entra novamente. Sessões são revogadas em logout, bloqueio, alteração de perfil e recuperação de senha.
 
 Convites duram 48 horas; links de redefinição, 30 minutos. Links funcionam uma vez e o token é colocado no fragmento da URL, removido da barra pelo frontend antes de fazer requisições. O backend usa respostas genéricas na recuperação e limites de tentativas persistidos no PostgreSQL. TOTP e fila de e-mails são criptografados com Fernet; os códigos de recuperação de MFA ficam somente como hashes. Códigos TOTP e de recuperação não podem ser reutilizados.
 

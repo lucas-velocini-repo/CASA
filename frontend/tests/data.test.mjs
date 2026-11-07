@@ -2,7 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { formatTimestamp, periodBounds, today } from "../src/utils/dates.js";
 import { fetchHistory } from "../src/services/api.js";
-import { automaticDomain, chartRows, formatValue, particulateBands } from "../src/utils/metrics.js";
+import {
+  automaticDomain,
+  chartRows,
+  formatValue,
+  particulateBands,
+  formatParticulateDifference,
+} from "../src/utils/metrics.js";
 import { integerAxis } from "../src/utils/chartAxes.js";
 import { makeCsv } from "../src/utils/export.js";
 const period = {
@@ -141,6 +147,12 @@ test("PM segments use adjacent cumulative differences and flag missing or decrea
   const differences = (values) => particulateBands(values).map(({ difference }) => difference);
   assert.deepEqual(differences({ pm1: 2, pm25: 5, pm4: 5, pm10: 6.5 }), [2, 3, 0, 1.5]);
   assert.deepEqual(differences({ pm1: 0, pm4: 5, pm10: 4 }), [0, null, null, null]);
+});
+test("PM differences distinguish exact zero from positive values that round to zero", () => {
+  assert.deepEqual(
+    [0, 0.01, 0.05, 0.123, null].map(formatParticulateDifference),
+    ["0", "< 0,1", "0,1", "0,1", "—"],
+  );
 });
 test("value axis has evenly spaced integer ticks and contains decimal readings", () => {
   assert.deepEqual(integerAxis([948.55, 948.86]), {

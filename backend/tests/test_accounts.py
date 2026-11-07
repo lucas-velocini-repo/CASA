@@ -1,6 +1,7 @@
 import json
 import os
-from datetime import timedelta
+from datetime import datetime, timedelta
+from http.cookies import SimpleCookie
 from urllib.parse import parse_qs, urlsplit
 
 import pyotp
@@ -10,11 +11,14 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
+from app.api import auth as auth_api
+from app.api import dependencies as auth_dependencies
 from app.core.security import (
     APP_URL,
     COOKIE,
     CSRF_COOKIE,
     PASSWORDS,
+    aware,
     decrypt,
     digest,
     encrypt,
@@ -366,6 +370,52 @@ def test_web_cookie_csrf_origin_logout_and_transport_separation(env):
     assert client.get("/devices").status_code == 401
     client.cookies.set(COOKIE, "alice")
     assert client.get("/devices").status_code == 401
+
+
+@pytest.mark.parametrize(
+    "transport, restricted, lifetime",
+    [
+        ("web", False, timedelta(days=14)),
+        ("mobile", False, timedelta(days=7)),
+        ("web", True, timedelta(minutes=10)),
+    ],
+)
+def test_login_expiration_matches_transport_and_cookie(
+    env, monkeypatch, transport, restricted, lifetime
+):
+    client, engine = env
+    now = utcnow()
+    monkeypatch.setattr(auth_api, "utcnow", lambda: now)
+    email = "alice@example.com"
+    if restricted:
+        email = "admin@example.com"
+        with Session(engine) as db:
+            admin = db.scalar(select(User).where(User.email == email))
+            admin.totp_enabled = False
+            db.commit()
+    result = client.post(
+        "/auth/login",
+        json={"email": email, "password": PASSWORD, "client": transport},
+        headers={"Origin": APP_URL},
+    )
+    assert result.status_code == 200
+    assert result.json()["mfa_setup_required"] is restricted
+    assert datetime.fromisoformat(result.json()["expires_at"]) == now + lifetime
+    headers = {}
+    if transport == "web":
+        cookies = SimpleCookie()
+        for value in result.headers.get_list("set-cookie"):
+            cookies.load(value)
+        for name in (COOKIE, CSRF_COOKIE):
+            assert int(cookies[name]["max-age"]) == lifetime.total_seconds()
+    else:
+        assert "set-cookie" not in result.headers
+        headers = auth(result.json()["token"])
+    me = client.get("/auth/me", headers=headers)
+    assert me.status_code == 200
+    assert aware(datetime.fromisoformat(me.json()["expires_at"])) == now + lifetime
+    monkeypatch.setattr(auth_dependencies, "utcnow", lambda: now + lifetime)
+    assert client.get("/auth/me", headers=headers).status_code == 401
 
 
 def test_admin_mfa_setup_is_restricted_and_recovery_codes_single_use(env):

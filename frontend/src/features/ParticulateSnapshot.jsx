@@ -7,7 +7,13 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { metrics, formatValue, particulateBands } from "../utils/metrics";
+import {
+  metrics,
+  formatValue,
+  particulateBands,
+  formatParticulateDifference,
+  PM_KEYS,
+} from "../utils/metrics";
 import { integerAxis } from "../utils/chartAxes";
 import { formatTimestamp } from "../utils/dates";
 
@@ -59,8 +65,12 @@ export default function ParticulateSnapshot({ reading, timeZone }) {
                   />
                   <YAxis type="category" hide />
                   <Tooltip
-                    labelFormatter={() => "Concentração por faixa"}
-                    formatter={(value, name) => [`${formatValue(value)} µg/m³`, name]}
+                    labelFormatter={() => "Concentração acumulada"}
+                    itemSorter={({ dataKey }) => PM_KEYS.indexOf(dataKey)}
+                    formatter={(_, name, { dataKey }) => [
+                      `${formatValue(reading.values[dataKey])} µg/m³`,
+                      name,
+                    ]}
                   />
                   {bands.map(({ key }) => (
                     <Bar
@@ -88,7 +98,9 @@ export default function ParticulateSnapshot({ reading, timeZone }) {
                 <dd>
                   {formatValue(value)} <small>µg/m³ acumulados</small>
                 </dd>
-                <dd className="snapshot-difference">Diferença: {formatValue(difference)} µg/m³</dd>
+                <dd className="snapshot-difference">
+                  Diferença: {formatParticulateDifference(difference)} µg/m³
+                </dd>
               </div>
             ))}
           </dl>

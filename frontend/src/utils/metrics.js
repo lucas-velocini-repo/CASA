@@ -109,6 +109,11 @@ export function particulateBands(values) {
     return { key, value, difference };
   });
 }
+
+export function formatParticulateDifference(value) {
+  const formatted = formatValue(value);
+  return value > 0 && formatted === "0" ? "< 0,1" : formatted;
+}
 export const OVERVIEW_KEYS = [
   "temperature",
   "humidity",

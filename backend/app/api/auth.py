@@ -60,7 +60,7 @@ def login(
         if restricted
         else timedelta(days=7)
         if data.client == "mobile"
-        else timedelta(hours=12)
+        else timedelta(days=14)
     )
     token, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
     db.add(
