@@ -25,7 +25,7 @@ function ReadingDetails({ reading, timeZone, unit, left }) {
       <strong>{formatTimestamp(reading.time, false, timeZone, true)}</strong>
       <small>Concentração acumulada · {unit}</small>
       <dl>
-        {reading.bands.map(({ key, value }) => (
+        {[...reading.bands].reverse().map(({ key, value }) => (
           <div key={key}>
             <dt style={{ color: metrics[key].color }}>{metrics[key].label}</dt>
             <dd>{formatValue(value)}</dd>
