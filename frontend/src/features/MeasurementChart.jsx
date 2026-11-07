@@ -118,10 +118,11 @@ export default function MeasurementChart({
                 <YAxis
                   domain={valueAxis.domain}
                   ticks={valueAxis.ticks}
+                  allowDataOverflow
                   interval={0}
                   allowDecimals={false}
                   width={65}
-                  tickFormatter={(value) => formatValue(value, 0)}
+                  tickFormatter={formatValue}
                   tick={{ fill: "#637c82", fontSize: 11 }}
                   axisLine={false}
                   tickLine={false}
@@ -130,7 +131,7 @@ export default function MeasurementChart({
                   labelFormatter={(value) =>
                     formatTimestamp(value, false, timeZone)
                   }
-                  formatter={(value, name) => [formatValue(value, 4), name]}
+                  formatter={(value, name) => [formatValue(value), name]}
                   contentStyle={{
                     borderRadius: 10,
                     border: "1px solid #dce8e5",

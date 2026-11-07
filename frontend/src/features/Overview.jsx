@@ -1,4 +1,4 @@
-import { Thermometer, Droplets, Gauge, Sun } from "lucide-react";
+import { Clock, Thermometer, Droplets, Gauge, Sun } from "lucide-react";
 import ParticulateSnapshot from "./ParticulateSnapshot";
 import MeasurementChart from "./MeasurementChart";
 import { metrics, formatValue, PM_KEYS } from "../utils/metrics";
@@ -17,10 +17,13 @@ export default function Overview({ rows, station, period, timeZone }) {
     <>
       <div className="section-heading">
         <h2>Visão geral</h2>
-        <span>
-          Última leitura no período:{" "}
-          {formatTimestamp(last.timestamp, false, timeZone)}
-        </span>
+        <div className="latest-reading">
+          <Clock size={16} aria-hidden="true" />
+          <span>Última leitura no período</span>
+          <time dateTime={last.timestamp}>
+            {formatTimestamp(last.timestamp, false, timeZone, true)}
+          </time>
+        </div>
       </div>
       <div className="metric-grid">
         {cards.map(({ key, Icon }) => (
@@ -30,7 +33,7 @@ export default function Overview({ rows, station, period, timeZone }) {
               <Icon size={19} style={{ color: metrics[key].color }} />
             </div>
             <strong>
-              {formatValue(last.values?.[key], key === "pressure" ? 2 : 1)}{" "}
+              {formatValue(last.values?.[key])}{" "}
               <small>{metrics[key].unit}</small>
             </strong>
             <span className="metric-caption">Última leitura do período</span>

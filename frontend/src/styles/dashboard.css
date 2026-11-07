@@ -1132,8 +1132,24 @@ tbody tr:nth-child(even) {
 .particulate-snapshot {
   margin-bottom: 20px;
 }
+.latest-reading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  padding: 7px 11px;
+  border: 1px solid #c8e7e2;
+  border-radius: 8px;
+  background: #edf8f6;
+  color: #245d59;
+  font-size: 12px;
+}
+.latest-reading time {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
 .snapshot-canvas {
-  height: 210px;
+  height: 80px;
   width: 100%;
 }
 .snapshot-values {
@@ -1143,8 +1159,16 @@ tbody tr:nth-child(even) {
   margin: 14px 8px;
 }
 .snapshot-values dt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   color: var(--muted);
   font-size: 11px;
+}
+.snapshot-values dt i {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
 }
 .snapshot-values dd {
   margin: 6px 0 0;
@@ -1153,6 +1177,11 @@ tbody tr:nth-child(even) {
 }
 .snapshot-values small {
   font-size: 10px;
+  font-weight: 400;
+}
+.snapshot-values .snapshot-difference {
+  color: var(--muted);
+  font-size: 11px;
   font-weight: 400;
 }
 .overview-pm-history {

@@ -79,6 +79,34 @@
   opacity: 0.55;
   cursor: default;
 }
+.account-password {
+  position: relative;
+  display: grid;
+  gap: 8px;
+}
+.account-password input {
+  padding-inline-end: 48px;
+}
+.account-password input::-ms-reveal {
+  display: none;
+}
+.account-password button {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 35px;
+  padding: 0;
+  background: transparent;
+  border-color: transparent;
+  color: #52677c;
+}
+.account-password button:hover {
+  background: #f1f6fb;
+  color: #17324b;
+}
 .account-card .account-link {
   display: block;
   background: transparent;

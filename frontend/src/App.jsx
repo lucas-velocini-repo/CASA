@@ -136,7 +136,22 @@ export default function App({ user, onLogout }) {
       /* Session preference still works. */
     }
   }
-  const [selectedId, setSelectedId] = useState(null);
+  const stationPreference = `casa.station.${user.id}`;
+  const [selectedId, setSelectedId] = useState(() => {
+    try {
+      return localStorage.getItem(stationPreference);
+    } catch {
+      return null;
+    }
+  });
+  function selectStation(id) {
+    setSelectedId(id);
+    try {
+      localStorage.setItem(stationPreference, id);
+    } catch {
+      /* Session preference still works. */
+    }
+  }
   const [revision, setRevision] = useState(0);
   const stations = usePolling(`stations:${revision}`, fetchStations, 30_000);
   const devices = stations.data?.devices || [];
@@ -197,7 +212,7 @@ export default function App({ user, onLogout }) {
             <StationSelector
               devices={devices}
               selectedId={selected.device_id}
-              onSelect={setSelectedId}
+              onSelect={selectStation}
             />
             <StationData
               key={timeZone}

@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { periodBounds, today } from "../src/utils/dates.js";
+import { formatTimestamp, periodBounds, today } from "../src/utils/dates.js";
 import { fetchHistory } from "../src/services/api.js";
-import { automaticDomain, chartRows } from "../src/utils/metrics.js";
+import { automaticDomain, chartRows, formatValue, particulateBands } from "../src/utils/metrics.js";
 import { integerAxis } from "../src/utils/chartAxes.js";
 import { makeCsv } from "../src/utils/export.js";
 const period = {
@@ -121,8 +121,26 @@ test("pressure axis shows small variation, constant and zero values remain valid
   assert.ok(max > 948.8 && max < 949);
   assert.deepEqual(
     automaticDomain([{ values: { light: 0 } }], ["light"]),
-    [-0.01, 0.01],
+    [0, 0.01],
   );
+});
+test("non-negative charts start no lower than zero, while temperature can be negative", () => {
+  for (const key of ["light", "pressure", "humidity", "pm1", "nc05"]) {
+    const rows = [{ values: { [key]: 0 } }, { values: { [key]: 5 } }];
+    const { ticks } = integerAxis(automaticDomain(rows, [key]));
+    assert.equal(ticks[0], 0);
+  }
+  const domain = automaticDomain([{ values: { temperature: -1 } }], ["temperature"]);
+  assert.ok(integerAxis(domain).ticks[0] < 0);
+});
+test("measurement display rounds to one decimal and latest reading can show seconds", () => {
+  assert.deepEqual([3.456, 3.4, 3, null].map(formatValue), ["3,5", "3,4", "3", "—"]);
+  assert.match(formatTimestamp("2026-09-19T03:12:34Z", false, "UTC", true), /03:12:34/);
+});
+test("PM segments use adjacent cumulative differences and flag missing or decreasing readings", () => {
+  const differences = (values) => particulateBands(values).map(({ difference }) => difference);
+  assert.deepEqual(differences({ pm1: 2, pm25: 5, pm4: 5, pm10: 6.5 }), [2, 3, 0, 1.5]);
+  assert.deepEqual(differences({ pm1: 0, pm4: 5, pm10: 4 }), [0, null, null, null]);
 });
 test("value axis has evenly spaced integer ticks and contains decimal readings", () => {
   assert.deepEqual(integerAxis([948.55, 948.86]), {

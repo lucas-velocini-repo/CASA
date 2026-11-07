@@ -3,25 +3,23 @@ export const metrics = {
     label: "Temperatura",
     unit: "°C",
     color: "#0a8585",
-    precision: 2,
   },
-  humidity: { label: "Umidade", unit: "%", color: "#5268bc", precision: 2 },
-  pressure: { label: "Pressão", unit: "hPa", color: "#a15d28", precision: 2 },
-  light: { label: "Luminosidade", unit: "lx", color: "#84702b", precision: 1 },
-  pm1: { label: "PM 1,0", unit: "µg/m³", color: "#0a8585", precision: 3 },
-  pm25: { label: "PM 2,5", unit: "µg/m³", color: "#d36a33", precision: 3 },
-  pm4: { label: "PM 4,0", unit: "µg/m³", color: "#7561b1", precision: 3 },
-  pm10: { label: "PM 10,0", unit: "µg/m³", color: "#b63d67", precision: 3 },
-  nc05: { label: "NC 0,5", unit: "#/cm³", color: "#0a8585", precision: 3 },
-  nc10: { label: "NC 1,0", unit: "#/cm³", color: "#d36a33", precision: 3 },
-  nc25: { label: "NC 2,5", unit: "#/cm³", color: "#7561b1", precision: 3 },
-  nc40: { label: "NC 4,0", unit: "#/cm³", color: "#b63d67", precision: 3 },
-  nc100: { label: "NC 10,0", unit: "#/cm³", color: "#406fab", precision: 3 },
+  humidity: { label: "Umidade", unit: "%", color: "#5268bc" },
+  pressure: { label: "Pressão", unit: "hPa", color: "#a15d28" },
+  light: { label: "Luminosidade", unit: "lx", color: "#84702b" },
+  pm1: { label: "PM 1,0", unit: "µg/m³", color: "#0a8585" },
+  pm25: { label: "PM 2,5", unit: "µg/m³", color: "#d36a33" },
+  pm4: { label: "PM 4,0", unit: "µg/m³", color: "#7561b1" },
+  pm10: { label: "PM 10,0", unit: "µg/m³", color: "#b63d67" },
+  nc05: { label: "NC 0,5", unit: "#/cm³", color: "#0a8585" },
+  nc10: { label: "NC 1,0", unit: "#/cm³", color: "#d36a33" },
+  nc25: { label: "NC 2,5", unit: "#/cm³", color: "#7561b1" },
+  nc40: { label: "NC 4,0", unit: "#/cm³", color: "#b63d67" },
+  nc100: { label: "NC 10,0", unit: "#/cm³", color: "#406fab" },
   typical_particle_size: {
     label: "Tamanho típico",
     unit: "µm",
     color: "#0a8585",
-    precision: 3,
   },
 };
 
@@ -40,9 +38,9 @@ export const tabs = [
   { id: "history", label: "Dados históricos" },
 ];
 
-export function formatValue(value, precision = 2) {
+export function formatValue(value) {
   return Number.isFinite(value)
-    ? value.toLocaleString("pt-BR", { maximumFractionDigits: precision })
+    ? value.toLocaleString("pt-BR", { maximumFractionDigits: 1 })
     : "—";
 }
 
@@ -63,7 +61,8 @@ export function automaticDomain(rows, keys) {
     max === min ? Math.abs(min) * 0.005 : 0,
     0.01,
   );
-  return [min - padding, max + padding];
+  if (keys.includes("temperature")) return [min - padding, max + padding];
+  return [Math.max(0, min - padding), Math.max(0, max + padding)];
 }
 
 // Keep bucket extrema of each visible series. Only chart rendering is reduced.
@@ -98,6 +97,18 @@ export function chartRows(rows, keys, budget = 1800) {
 }
 
 export const PM_KEYS = ["pm1", "pm25", "pm4", "pm10"];
+
+export function particulateBands(values) {
+  return PM_KEYS.map((key, index) => {
+    const value = values?.[key];
+    const previous = index === 0 ? 0 : values?.[PM_KEYS[index - 1]];
+    const difference =
+      Number.isFinite(value) && Number.isFinite(previous) && previous >= 0 && value >= previous
+        ? value - previous
+        : null;
+    return { key, value, difference };
+  });
+}
 export const OVERVIEW_KEYS = [
   "temperature",
   "humidity",

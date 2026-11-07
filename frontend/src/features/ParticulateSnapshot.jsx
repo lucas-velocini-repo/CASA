@@ -6,21 +6,17 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Cell,
 } from "recharts";
-import { metrics, formatValue, PM_KEYS } from "../utils/metrics";
+import { metrics, formatValue, particulateBands } from "../utils/metrics";
 import { integerAxis } from "../utils/chartAxes";
 import { formatTimestamp } from "../utils/dates";
 
 export default function ParticulateSnapshot({ reading, timeZone }) {
-  const data = PM_KEYS.map((key) => ({
-    key,
-    name: metrics[key].label,
-    value: reading.values?.[key] ?? null,
-  }));
-  const values = data.map(({ value }) => value).filter(Number.isFinite);
-  const hasData = values.length > 0;
-  const valueAxis = integerAxis([Math.min(0, ...values), Math.max(0, ...values)]);
+  const bands = particulateBands(reading.values);
+  const hasData = bands.some(({ value }) => Number.isFinite(value));
+  const canStack = bands.every(({ difference }) => difference !== null);
+  const stack = Object.fromEntries(bands.map(({ key, difference }) => [key, difference]));
+  const valueAxis = integerAxis([0, canStack ? bands.at(-1).value : 0]);
   return (
     <section className="chart-card particulate-snapshot">
       <div className="chart-heading">
@@ -33,71 +29,71 @@ export default function ParticulateSnapshot({ reading, timeZone }) {
       </div>
       {hasData ? (
         <>
-          <div
-            className="snapshot-canvas"
-            role="img"
-            aria-label="Concentrações PM da última leitura do período; valores apresentados abaixo"
-          >
-            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-              <BarChart
-                data={data}
-                margin={{ top: 14, right: 16, left: 0, bottom: 4 }}
-                accessibilityLayer
-              >
-                <CartesianGrid
-                  stroke="#e4eeec"
-                  vertical={false}
-                  strokeDasharray="3 4"
-                />
-                <XAxis
-                  dataKey="name"
-                  tick={{ fill: "#637c82", fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  domain={valueAxis.domain}
-                  ticks={valueAxis.ticks}
-                  interval={0}
-                  allowDecimals={false}
-                  width={60}
-                  tickFormatter={(value) => formatValue(value, 0)}
-                  tick={{ fill: "#637c82", fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip
-                  formatter={(value) => [
-                    `${formatValue(value, 3)} µg/m³`,
-                    "Concentração",
-                  ]}
-                />
-                <Bar
-                  dataKey="value"
-                  name="Concentração"
-                  maxBarSize={72}
-                  radius={[5, 5, 0, 0]}
-                  isAnimationActive={false}
+          {canStack ? (
+            <div
+              className="snapshot-canvas"
+              role="img"
+              aria-label="Barra empilhada com a concentração de cada faixa de tamanho. Valores abaixo."
+            >
+              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                <BarChart
+                  layout="vertical"
+                  data={[stack]}
+                  margin={{ top: 8, right: 24, left: 12, bottom: 0 }}
+                  accessibilityLayer
                 >
-                  {data.map((item) => (
-                    <Cell key={item.key} fill={metrics[item.key].color} />
+                  <CartesianGrid
+                    stroke="#e4eeec"
+                    horizontal={false}
+                    strokeDasharray="3 4"
+                  />
+                  <XAxis
+                    type="number"
+                    domain={valueAxis.domain}
+                    ticks={valueAxis.ticks}
+                    allowDecimals={false}
+                    tickFormatter={formatValue}
+                    tick={{ fill: "#637c82", fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis type="category" hide />
+                  <Tooltip
+                    labelFormatter={() => "Concentração por faixa"}
+                    formatter={(value, name) => [`${formatValue(value)} µg/m³`, name]}
+                  />
+                  {bands.map(({ key }) => (
+                    <Bar
+                      key={key}
+                      dataKey={key}
+                      name={metrics[key].label}
+                      stackId="pm"
+                      fill={metrics[key].color}
+                      maxBarSize={32}
+                      isAnimationActive={false}
+                    />
                   ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <p className="chart-note">
+              A barra precisa de valores cumulativos completos e em ordem crescente de tamanho.
+            </p>
+          )}
           <dl className="snapshot-values">
-            {data.map((item) => (
-              <div key={item.key}>
-                <dt>{item.name}</dt>
+            {bands.map(({ key, value, difference }) => (
+              <div key={key}>
+                <dt><i style={{ background: metrics[key].color }} />{metrics[key].label}</dt>
                 <dd>
-                  {formatValue(item.value, 3)} <small>µg/m³</small>
+                  {formatValue(value)} <small>µg/m³ acumulados</small>
                 </dd>
+                <dd className="snapshot-difference">Diferença: {formatValue(difference)} µg/m³</dd>
               </div>
             ))}
           </dl>
           <p className="chart-note">
-            As classes PM são cumulativas; as barras não devem ser somadas.
+            Cada segmento mostra a diferença em relação à classe anterior, começando em zero.
           </p>
         </>
       ) : (

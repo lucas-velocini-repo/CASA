@@ -28,10 +28,12 @@ export async function apiRequest(path, { method = "GET", body, signal } = {}) {
     if (response.status === 401 && path !== "/auth/login")
       window.dispatchEvent(new Event("casa:session-expired"));
     const detail = typeof data?.detail === "string" ? data.detail : null;
-    throw new Error(
+    const error = new Error(
       detail ||
         `Não foi possível concluir a solicitação (HTTP ${response.status}).`,
     );
+    error.status = response.status;
+    throw error;
   }
   return data;
 }

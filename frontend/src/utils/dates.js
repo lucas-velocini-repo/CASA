@@ -79,7 +79,7 @@ export function periodBounds(period, timeZone = TIME_ZONE) {
   return { start, end };
 }
 
-export function formatTimestamp(value, short = false, timeZone = TIME_ZONE) {
+export function formatTimestamp(value, short = false, timeZone = TIME_ZONE, withSeconds = false) {
   if (!value) return "Sem registro";
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return "Data inválida";
@@ -90,6 +90,7 @@ export function formatTimestamp(value, short = false, timeZone = TIME_ZONE) {
     ...(short ? {} : { year: "numeric" }),
     hour: "2-digit",
     minute: "2-digit",
+    ...(withSeconds ? { second: "2-digit" } : {}),
   });
 }
 

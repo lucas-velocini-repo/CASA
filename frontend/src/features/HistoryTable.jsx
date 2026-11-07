@@ -48,7 +48,7 @@ export default function HistoryTable({ rows, timeZone }) {
                   {formatTimestamp(row.timestamp, false, timeZone)}
                 </th>
                 {keys.map((key) => (
-                  <td key={key}>{formatValue(row.values?.[key], 5)}</td>
+                  <td key={key}>{formatValue(row.values?.[key])}</td>
                 ))}
               </tr>
             ))}

@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { apiRequest } from "../services/session";
 import logo from "../../assets/t2p-logo.png";
 import "../styles/accounts.css";
@@ -16,6 +17,44 @@ const initialAction = (() => {
   if (kind) window.history.replaceState(null, "", window.location.pathname);
   return { kind, token };
 })();
+
+const MFA_REQUIRED_MESSAGE =
+  "Informe um código de autenticação válido ou um código de recuperação.";
+
+function login(credentials, mfaCode = "") {
+  return apiRequest("/auth/login", {
+    method: "POST",
+    body: { ...credentials, mfa_code: mfaCode, client: "web" },
+  });
+}
+
+function LoginPassword() {
+  const [visible, setVisible] = useState(false);
+  const Icon = visible ? EyeOff : Eye;
+  const action = visible ? "Ocultar senha" : "Mostrar senha";
+  return (
+    <div className="account-password">
+      <label htmlFor="login-password">Senha</label>
+      <input
+        id="login-password"
+        name="password"
+        type={visible ? "text" : "password"}
+        autoComplete="current-password"
+        maxLength={128}
+        required
+      />
+      <button
+        type="button"
+        aria-label={action}
+        title={action}
+        aria-controls="login-password"
+        onClick={() => setVisible((value) => !value)}
+      >
+        <Icon size={19} aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
 
 function AccountCard({ children }) {
   return (
@@ -134,7 +173,12 @@ export default function AccountGate({ children }) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
-  const [showAdminCode, setShowAdminCode] = useState(false);
+  // The current API requires resending credentials with the second factor.
+  const pendingLogin = useRef(null);
+  const codeInput = useRef(null);
+  useEffect(() => {
+    if (mode === "mfa") codeInput.current?.focus();
+  }, [mode]);
   useEffect(() => {
     const controller = new AbortController();
     if (!initialAction.kind)
@@ -147,6 +191,7 @@ export default function AccountGate({ children }) {
           if (!controller.signal.aborted) setChecking(false);
         });
     const expired = () => {
+      pendingLogin.current = null;
       setSession(null);
       setMode("login");
       setNotice("Entre para continuar.");
@@ -173,19 +218,20 @@ export default function AccountGate({ children }) {
     setBusy(true);
     const form = new FormData(event.currentTarget);
     try {
-      if (mode === "login")
-        setSession(
-          await apiRequest("/auth/login", {
-            method: "POST",
-            body: {
-              email: form.get("email"),
-              password: form.get("password"),
-              mfa_code: form.get("mfa_code") || "",
-              client: "web",
-            },
-          }),
-        );
-      else if (mode === "forgot") {
+      if (mode === "login") {
+        const credentials = { email: form.get("email"), password: form.get("password") };
+        try {
+          setSession(await login(credentials));
+        } catch (e) {
+          if (e.status !== 401 || e.message !== MFA_REQUIRED_MESSAGE) throw e;
+          pendingLogin.current = credentials;
+          setMode("mfa");
+        }
+      } else if (mode === "mfa") {
+        setSession(await login(pendingLogin.current, form.get("mfa_code")));
+        pendingLogin.current = null;
+        setMode("login");
+      } else if (mode === "forgot") {
         const result = await apiRequest("/auth/forgot-password", {
           method: "POST",
           body: { email: form.get("email") },
@@ -241,6 +287,7 @@ export default function AccountGate({ children }) {
       </>
     );
   const settingPassword = mode === "invite" || mode === "reset";
+  const mfaStep = mode === "mfa";
   return (
     <AccountCard>
       <h1>
@@ -250,17 +297,21 @@ export default function AccountGate({ children }) {
             ? "Defina uma nova senha"
             : mode === "forgot"
               ? "Recupere seu acesso"
-              : "Entre no CASA"}
+              : mfaStep
+                ? "Confirme seu acesso"
+                : "Entre no CASA"}
       </h1>
       <p>
         {mode === "login"
           ? "Acompanhe as estações vinculadas à sua conta."
           : settingPassword
             ? "Use uma senha com pelo menos 8 caracteres. Você pode usar uma frase."
-            : "Informe o e-mail da sua conta para receber as instruções."}
+            : mfaStep
+              ? "Digite o código do seu autenticador ou use um código de recuperação."
+              : "Informe o e-mail da sua conta para receber as instruções."}
       </p>
       <form onSubmit={submit} key={mode}>
-        {!settingPassword && (
+        {!settingPassword && !mfaStep && (
           <label>
             E-mail
             <input
@@ -272,16 +323,15 @@ export default function AccountGate({ children }) {
             />
           </label>
         )}
-        {mode !== "forgot" && (
+        {mode === "login" && <LoginPassword />}
+        {settingPassword && (
           <label>
-            {settingPassword ? "Nova senha" : "Senha"}
+            Nova senha
             <input
               name="password"
               type="password"
-              autoComplete={
-                settingPassword ? "new-password" : "current-password"
-              }
-              minLength={settingPassword ? 8 : 1}
+              autoComplete="new-password"
+              minLength={8}
               maxLength={128}
               required
             />
@@ -300,19 +350,17 @@ export default function AccountGate({ children }) {
             />
           </label>
         )}
-        {mode === "login" && (
-          <button type="button" className="account-link" aria-expanded={showAdminCode} aria-controls="admin-login-code" onClick={() => setShowAdminCode((value) => !value)}>
-            {showAdminCode ? "Ocultar código de administrador" : "Sou administrador"}
-          </button>
-        )}
-        {mode === "login" && showAdminCode && (
-          <label id="admin-login-code">
-            Código de autenticação <span>(administradores)</span>
+        {mfaStep && (
+          <label>
+            Código de autenticação
             <input
+              ref={codeInput}
               name="mfa_code"
               autoComplete="one-time-code"
+              autoCapitalize="none"
+              spellCheck={false}
+              required
               maxLength={64}
-              placeholder="Autenticador ou código de recuperação"
             />
           </label>
         )}
@@ -333,12 +381,16 @@ export default function AccountGate({ children }) {
               ? "Entrar"
               : mode === "forgot"
                 ? "Enviar instruções"
-                : "Salvar senha"}
+                : mfaStep
+                  ? "Verificar código"
+                  : "Salvar senha"}
         </button>
       </form>
       <button
         className="account-link"
+        disabled={busy}
         onClick={() => {
+          pendingLogin.current = null;
           setMode(mode === "login" ? "forgot" : "login");
           setError("");
           setNotice("");
