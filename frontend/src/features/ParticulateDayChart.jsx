@@ -1,0 +1,225 @@
+import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { ChevronFirst, ChevronLast } from "lucide-react";
+import { integerAxis } from "../utils/chartAxes";
+import { formatTimestamp } from "../utils/dates";
+import { formatValue, metrics, PM_KEYS } from "../utils/metrics";
+import { latestParticulateDay } from "../utils/particulateDay";
+
+const COLUMN_WIDTH = 32;
+const AXIS_WIDTH = 52;
+const OVERSCAN = 3;
+
+function ReadingDetails({ reading, timeZone, left }) {
+  return (
+    <div className={`pm-day-tooltip ${left ? "pm-day-tooltip-left" : ""}`} role="status">
+      <strong>{formatTimestamp(reading.time, false, timeZone, true)}</strong>
+      <small>Concentração acumulada · µg/m³</small>
+      <dl>
+        {reading.bands.map(({ key, value }) => (
+          <div key={key}>
+            <dt style={{ color: metrics[key].color }}>{metrics[key].label}</dt>
+            <dd>{formatValue(value)}</dd>
+          </div>
+        ))}
+      </dl>
+      {!reading.complete && <small>Empilhamento indisponível para esta leitura</small>}
+    </div>
+  );
+}
+
+function ScrollableReadings({ readings, max, timeZone }) {
+  const scrollRef = useRef(null);
+  const followLatest = useRef(true);
+  const previousReadings = useRef(readings);
+  const [viewport, setViewport] = useState({ left: 0, width: 0 });
+  const [activeId, setActiveId] = useState(null);
+  const scrollId = useId();
+  const hintId = useId();
+  const hour = useMemo(
+    () => new Intl.DateTimeFormat("pt-BR", { timeZone, hour: "2-digit", minute: "2-digit" }),
+    [timeZone],
+  );
+
+  function updateViewport(element) {
+    const { scrollLeft: left, clientWidth: width } = element;
+    setViewport((previous) =>
+      previous.left === left && previous.width === width ? previous : { left, width },
+    );
+  }
+
+  useLayoutEffect(() => {
+    const element = scrollRef.current;
+    const previous = previousReadings.current;
+    if (followLatest.current) {
+      element.scrollLeft = element.scrollWidth;
+    } else if (previous !== readings) {
+      // A delayed reading can be inserted before the visible measurements.
+      const first = Math.floor(element.scrollLeft / COLUMN_WIDTH);
+      const anchor = readings.findIndex(({ id }) => id === previous[first]?.id);
+      if (anchor >= 0) element.scrollLeft += (anchor - first) * COLUMN_WIDTH;
+    }
+    previousReadings.current = readings;
+    updateViewport(element);
+  }, [readings]);
+
+  useLayoutEffect(() => {
+    const element = scrollRef.current;
+    const observer = new ResizeObserver(() => {
+      if (followLatest.current) element.scrollLeft = element.scrollWidth;
+      updateViewport(element);
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  function onScroll(event) {
+    const element = event.currentTarget;
+    followLatest.current = element.scrollWidth - element.clientWidth - element.scrollLeft <= 2;
+    updateViewport(element);
+  }
+
+  const last = readings.length - 1;
+  const active = activeId === null ? -1 : readings.findIndex(({ id }) => id === activeId);
+  const visibleStart = Math.floor(viewport.left / COLUMN_WIDTH);
+  const plotWidth = Math.max(0, viewport.width - AXIS_WIDTH);
+  const visibleEnd = Math.ceil((viewport.left + plotWidth) / COLUMN_WIDTH);
+  const firstRendered = Math.max(0, visibleStart - OVERSCAN);
+  const rendered = readings.slice(firstRendered, visibleEnd + OVERSCAN);
+  const axis = integerAxis([0, max]);
+  const top = axis.domain[1];
+  const showDetails = active >= visibleStart && active < visibleEnd;
+
+  function goTo(index) {
+    const element = scrollRef.current;
+    const left = index * COLUMN_WIDTH;
+    if (index === 0) element.scrollLeft = 0;
+    else if (index === last) element.scrollLeft = element.scrollWidth;
+    else if (left < element.scrollLeft) element.scrollLeft = left;
+    else if (left + COLUMN_WIDTH > element.scrollLeft + element.clientWidth - AXIS_WIDTH)
+      element.scrollLeft = left + COLUMN_WIDTH - element.clientWidth + AXIS_WIDTH;
+    followLatest.current = element.scrollWidth - element.clientWidth - element.scrollLeft <= 2;
+    updateViewport(element);
+    setActiveId(readings[index].id);
+  }
+
+  function onKeyDown(event) {
+    const current = showDetails ? active : Math.min(last, visibleEnd - 1);
+    let next;
+    if (event.key === "ArrowLeft") next = Math.max(0, current - 1);
+    else if (event.key === "ArrowRight") next = Math.min(last, current + 1);
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = last;
+    else return;
+    event.preventDefault();
+    goTo(next);
+  }
+
+  return (
+    <>
+      <div className="chart-canvas pm-day-frame" style={{ "--pm-day-axis-width": `${AXIS_WIDTH}px` }}>
+        <div
+          className="pm-day-scroll"
+          ref={scrollRef}
+          id={scrollId}
+          tabIndex={0}
+          role="region"
+          aria-label="Medições de particulados PM em ordem cronológica"
+          aria-describedby={hintId}
+          onScroll={onScroll}
+          onKeyDown={onKeyDown}
+        >
+          <div className="pm-day-track" style={{ width: AXIS_WIDTH + readings.length * COLUMN_WIDTH }}>
+            <div className="pm-day-axis" aria-hidden="true">
+              <div className="pm-day-axis-ticks">
+                {axis.ticks.map((tick) => (
+                  <span key={tick} style={{ bottom: `${tick / top * 100}%` }}>{formatValue(tick)}</span>
+                ))}
+              </div>
+            </div>
+            <div className="pm-day-grid" aria-hidden="true">
+              {axis.ticks.map((tick) => <i key={tick} style={{ bottom: `${tick / top * 100}%` }} />)}
+            </div>
+            {rendered.map((reading, offset) => {
+              const index = firstRendered + offset;
+              const center = (index + 0.5) * COLUMN_WIDTH - viewport.left;
+              const showHour = index % 3 === 0 && center >= 16 && center <= plotWidth - 16;
+              return (
+                <button
+                  type="button"
+                  className="pm-day-column"
+                  tabIndex={-1}
+                  key={reading.id}
+                  style={{ left: AXIS_WIDTH + index * COLUMN_WIDTH, width: COLUMN_WIDTH }}
+                  aria-label={formatTimestamp(reading.time, false, timeZone, true)}
+                  aria-pressed={reading.id === activeId}
+                  onPointerEnter={(event) => {
+                    if (event.pointerType === "mouse") setActiveId(reading.id);
+                  }}
+                  onPointerLeave={(event) => {
+                    if (event.pointerType === "mouse") setActiveId(null);
+                  }}
+                  onClick={() => setActiveId(reading.id)}
+                >
+                  <span className="pm-day-stack" aria-hidden="true">
+                    {reading.complete && reading.bands.map(({ key, difference }) => (
+                      <i key={key} style={{ height: `${difference / top * 100}%`, background: metrics[key].color }} />
+                    ))}
+                  </span>
+                  {showHour && <span className="pm-day-hour" aria-hidden="true">{hour.format(reading.time)}</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        {showDetails && (
+          <ReadingDetails
+            reading={readings[active]}
+            timeZone={timeZone}
+            left={active * COLUMN_WIDTH - viewport.left >= plotWidth / 2}
+          />
+        )}
+      </div>
+      <div className="pm-day-actions">
+        <button type="button" className="icon-button" aria-controls={scrollId} onClick={() => goTo(0)}>
+          <ChevronFirst size={16} aria-hidden="true" /> Ir para a primeira leitura
+        </button>
+        <button type="button" className="icon-button" aria-controls={scrollId} onClick={() => goTo(last)}>
+          Ir para a última leitura <ChevronLast size={16} aria-hidden="true" />
+        </button>
+      </div>
+      <div className="chart-legend">
+        {PM_KEYS.map((key) => (
+          <span key={key}><i style={{ background: metrics[key].color }} />{metrics[key].label}</span>
+        ))}
+      </div>
+      <p className="chart-note" id={hintId}>
+        Role para ver outras leituras. Use as setas do teclado ou toque em uma barra para ver os valores.
+      </p>
+    </>
+  );
+}
+
+export default function ParticulateDayChart({ rows, timeZone }) {
+  const { date, readings, max, hasMissing } = useMemo(
+    () => latestParticulateDay(rows, timeZone),
+    [rows, timeZone],
+  );
+  return (
+    <section className="chart-card pm-day-card">
+      <div className="chart-heading">
+        <div>
+          <h3>Particulados PM por leitura</h3>
+          <small>{date} · µg/m³ · {readings.length.toLocaleString("pt-BR")} leituras</small>
+        </div>
+      </div>
+      {readings.some(({ complete }) => complete) ? (
+        <>
+          <ScrollableReadings key={date} readings={readings} max={max} timeZone={timeZone} />
+          {hasMissing && <p className="chart-note">Leituras com dados incompletos ou inconsistentes aparecem sem barra.</p>}
+        </>
+      ) : (
+        <div className="metric-empty">Não há leituras de PM com valores completos e cumulativos neste dia.</div>
+      )}
+    </section>
+  );
+}

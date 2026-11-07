@@ -1,5 +1,6 @@
 import { Clock, Thermometer, Droplets, Gauge, Sun } from "lucide-react";
 import ParticulateSnapshot from "./ParticulateSnapshot";
+import ParticulateDayChart from "./ParticulateDayChart";
 import MeasurementChart from "./MeasurementChart";
 import { metrics, formatValue, PM_KEYS } from "../utils/metrics";
 import { formatTimestamp } from "../utils/dates";
@@ -55,7 +56,7 @@ export default function Overview({ rows, station, period, timeZone }) {
           />
         ))}
       </div>
-      <div className="overview-pm-history">
+      <div className="overview-charts overview-pm-history">
         <MeasurementChart
           rows={rows}
           keys={PM_KEYS}
@@ -64,6 +65,7 @@ export default function Overview({ rows, station, period, timeZone }) {
           period={period}
           timeZone={timeZone}
         />
+        <ParticulateDayChart rows={rows} timeZone={timeZone} />
       </div>
     </>
   );

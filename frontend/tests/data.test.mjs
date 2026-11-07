@@ -10,6 +10,7 @@ import {
   formatParticulateDifference,
 } from "../src/utils/metrics.js";
 import { integerAxis } from "../src/utils/chartAxes.js";
+import { latestParticulateDay } from "../src/utils/particulateDay.js";
 import { makeCsv } from "../src/utils/export.js";
 const period = {
   startDate: "2026-09-19",
@@ -153,6 +154,21 @@ test("PM differences distinguish exact zero from positive values that round to z
     [0, 0.01, 0.05, 0.123, null].map(formatParticulateDifference),
     ["0", "< 0,1", "0,1", "0,1", "—"],
   );
+});
+test("daily PM columns keep the last local day and distinguish incomplete readings from zero", () => {
+  const rows = [
+    ["2026-09-20T02:59:00Z", { pm1: 20, pm25: 20, pm4: 20, pm10: 20 }],
+    ["2026-09-20T03:00:00Z", { pm1: 0, pm25: 0, pm4: 0, pm10: 0 }],
+    ["2026-09-20T04:00:00Z", { pm1: 3, pm25: 5, pm4: 5, pm10: 8 }],
+    ["2026-09-20T05:00:00Z", { pm1: 8, pm10: 15 }],
+  ].map(([timestamp, values], measurement_id) => ({ measurement_id, time: Date.parse(timestamp), values }));
+  const day = latestParticulateDay(rows, "America/Sao_Paulo");
+  assert.equal(day.date, "20/09/2026");
+  assert.equal(day.max, 8);
+  assert.equal(day.hasMissing, true);
+  assert.deepEqual(day.readings.map(({ id, complete }) => [id, complete]), [[1, true], [2, true], [3, false]]);
+  assert.deepEqual(day.readings[1].bands.map(({ difference }) => difference), [3, 2, 0, 3]);
+  assert.equal(latestParticulateDay(rows, "UTC").readings.length, 4);
 });
 test("value axis has evenly spaced integer ticks and contains decimal readings", () => {
   assert.deepEqual(integerAxis([948.55, 948.86]), {
