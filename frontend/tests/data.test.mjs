@@ -12,7 +12,7 @@ import {
   PM_KEYS,
 } from "../src/utils/metrics.js";
 import { integerAxis } from "../src/utils/chartAxes.js";
-import { latestParticulateDay, particulatePeriodMax, particulateReadingMax } from "../src/utils/particulateDay.js";
+import { particulateReadingMax, prepareParticulateReadings } from "../src/utils/particulateReadings.js";
 import { makeCsv } from "../src/utils/export.js";
 const period = {
   startDate: "2026-09-19",
@@ -157,29 +157,28 @@ test("PM differences distinguish exact zero from positive values that round to z
     ["0", "< 0,1", "0,1", "0,1", "—"],
   );
 });
-test("daily PM columns keep the last local day and distinguish incomplete readings from zero", () => {
+test("PM columns keep readings across midnight and distinguish incomplete readings from zero", () => {
   const rows = [
     ["2026-09-20T02:59:00Z", { pm1: 20, pm25: 20, pm4: 20, pm10: 20 }],
     ["2026-09-20T03:00:00Z", { pm1: 0, pm25: 0, pm4: 0, pm10: 0 }],
     ["2026-09-20T04:00:00Z", { pm1: 3, pm25: 5, pm4: 5, pm10: 8 }],
     ["2026-09-20T05:00:00Z", { pm1: 8, pm10: 15 }],
   ].map(([timestamp, values], measurement_id) => ({ measurement_id, time: Date.parse(timestamp), values }));
-  const day = latestParticulateDay(rows, "America/Sao_Paulo");
-  assert.equal(day.date, "20/09/2026");
-  assert.equal(day.max, 8);
-  assert.equal(day.hasMissing, true);
-  assert.deepEqual(day.readings.map(({ id, complete }) => [id, complete]), [[1, true], [2, true], [3, false]]);
-  assert.deepEqual(day.readings[1].bands.map(({ difference }) => difference), [3, 2, 0, 3]);
-  assert.equal(latestParticulateDay(rows, "UTC").readings.length, 4);
+  const { readings, max, hasMissing, hasData } = prepareParticulateReadings(rows);
+  assert.equal(max, 20);
+  assert.equal(hasMissing, true);
+  assert.equal(hasData, true);
+  assert.deepEqual(readings.map(({ id, complete }) => [id, complete]), [[0, true], [1, true], [2, true], [3, false]]);
+  assert.deepEqual(readings[2].bands.map(({ difference }) => difference), [3, 2, 0, 3]);
 });
-test("daily NC columns stack five adjacent differences and scale to NC 10,0", () => {
+test("NC columns stack five adjacent differences and scale to NC 10,0", () => {
   const time = Date.parse("2026-09-20T03:00:00Z");
   const values = { nc05: 21, nc10: 30, nc25: 34, nc40: 34, nc100: 36 };
   const rows = [
     { measurement_id: 1, time, values },
     { measurement_id: 2, time: time + 60_000, values: { ...values, nc40: 33, nc100: 90 } },
   ];
-  const { max, readings } = latestParticulateDay(rows, "UTC", NC_KEYS);
+  const { max, readings } = prepareParticulateReadings(rows, NC_KEYS);
   assert.equal(max, 36);
   assert.equal(readings[0].complete, true);
   assert.deepEqual(readings[0].bands.map(({ difference }) => difference), [21, 9, 4, 0, 2]);
@@ -193,10 +192,10 @@ test("the visible PM scale excludes older peaks and incomplete readings", () => 
     { pm10: 200 },
     { pm1: 0, pm25: 0, pm4: 0, pm10: 0 },
   ].map((values, i) => ({ measurement_id: i, time: time + i * 60_000, values }));
-  const day = latestParticulateDay(readings, "UTC");
-  assert.equal(day.max, 100);
-  assert.deepEqual(integerAxis([0, particulateReadingMax(day.readings.slice(1))]).domain, [0, 15]);
-  assert.deepEqual(integerAxis([0, particulateReadingMax(day.readings.slice(2))]).domain, [0, 1]);
+  const period = prepareParticulateReadings(readings);
+  assert.equal(period.max, 100);
+  assert.deepEqual(integerAxis([0, particulateReadingMax(period.readings.slice(1))]).domain, [0, 15]);
+  assert.deepEqual(integerAxis([0, particulateReadingMax(period.readings.slice(2))]).domain, [0, 1]);
 });
 test("fixed particulate scales include prior days in the filtered period", () => {
   const rows = [
@@ -204,10 +203,12 @@ test("fixed particulate scales include prior days in the filtered period", () =>
     ["2026-09-19T13:00:00Z", { pm10: 1000, nc05: 900, nc10: 800, nc25: 900, nc40: 1000, nc100: 1100 }],
     ["2026-09-20T12:00:00Z", { pm1: 3, pm25: 5, pm4: 8, pm10: 12, nc05: 15, nc10: 20, nc25: 25, nc40: 28, nc100: 34 }],
   ].map(([timestamp, values], measurement_id) => ({ measurement_id, time: Date.parse(timestamp), values }));
-  assert.equal(latestParticulateDay(rows, "UTC", PM_KEYS).max, 12);
-  assert.equal(latestParticulateDay(rows, "UTC", NC_KEYS).max, 34);
-  assert.equal(particulatePeriodMax(rows, PM_KEYS), 100);
-  assert.equal(particulatePeriodMax(rows, NC_KEYS), 250);
+  const pm = prepareParticulateReadings(rows, PM_KEYS);
+  const nc = prepareParticulateReadings(rows, NC_KEYS);
+  assert.equal(pm.max, 100);
+  assert.equal(nc.max, 250);
+  assert.equal(particulateReadingMax(pm.readings.slice(-1)), 12);
+  assert.equal(particulateReadingMax(nc.readings.slice(-1)), 34);
 });
 test("value axis has evenly spaced integer ticks and contains decimal readings", () => {
   assert.deepEqual(integerAxis([948.55, 948.86]), {

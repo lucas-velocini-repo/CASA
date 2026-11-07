@@ -1,6 +1,6 @@
 import { Clock, Thermometer, Droplets, Gauge, Sun } from "lucide-react";
 import ParticulateSnapshot from "./ParticulateSnapshot";
-import ParticulateDayChart from "./ParticulateDayChart";
+import ParticulateReadingChart from "./ParticulateReadingChart";
 import MeasurementChart from "./MeasurementChart";
 import { metrics, formatValue, PM_KEYS } from "../utils/metrics";
 import { formatTimestamp } from "../utils/dates";
@@ -65,7 +65,7 @@ export default function Overview({ rows, station, period, timeZone }) {
           period={period}
           timeZone={timeZone}
         />
-        <ParticulateDayChart rows={rows} station={station} timeZone={timeZone} />
+        <ParticulateReadingChart rows={rows} station={station} timeZone={timeZone} />
       </div>
     </>
   );

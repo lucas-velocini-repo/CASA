@@ -87,7 +87,6 @@ export async function exportParticulateChart({
   seriesKeys,
   title,
   station,
-  date,
   timeZone,
   unit,
 }) {
@@ -105,6 +104,10 @@ export async function exportParticulateChart({
 
   const from = formatTimestamp(readings[0].time, false, timeZone, true);
   const to = formatTimestamp(readings.at(-1).time, false, timeZone, true);
+  const dateFormat = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone });
+  const firstDate = dateFormat.format(readings[0].time);
+  const lastDate = dateFormat.format(readings.at(-1).time);
+  const multipleDates = firstDate !== lastDate;
   context.fillStyle = "#153449";
   context.font = "bold 17px Arial, sans-serif";
   context.fillText(title, 18, 27);
@@ -123,7 +126,7 @@ export async function exportParticulateChart({
   }
 
   const left = 72;
-  const right = width - 24;
+  const right = width - (multipleDates ? 48 : 24);
   const bottom = 464;
   const plotHeight = 328;
   const top = bottom - plotHeight;
@@ -143,9 +146,13 @@ export async function exportParticulateChart({
 
   const slot = (right - left) / readings.length;
   const barWidth = Math.min(36, slot - 6);
-  const tickInterval = Math.max(1, Math.ceil(64 / slot));
+  const tickInterval = Math.max(1, Math.ceil((multipleDates ? 100 : 64) / slot));
   const clock = new Intl.DateTimeFormat("pt-BR", {
-    timeZone, hour: "2-digit", minute: "2-digit", second: "2-digit",
+    timeZone,
+    ...(multipleDates ? { day: "2-digit", month: "2-digit" } : {}),
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
   });
   context.textAlign = "center";
   readings.forEach(({ time, complete, bands }, index) => {
@@ -166,7 +173,8 @@ export async function exportParticulateChart({
     }
   });
 
-  await downloadPng(canvas, `${station}_${title}_${date.replaceAll("/", "-")}`);
+  const dates = multipleDates ? `${firstDate}_${lastDate}` : firstDate;
+  await downloadPng(canvas, `${station}_${title}_${dates.replaceAll("/", "-")}`);
 }
 
 export async function exportChart(

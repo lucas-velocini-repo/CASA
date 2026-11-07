@@ -4,7 +4,7 @@ import { integerAxis } from "../utils/chartAxes";
 import { formatTimestamp } from "../utils/dates";
 import { exportParticulateChart } from "../utils/export";
 import { formatValue, metrics, NC_KEYS, PM_KEYS } from "../utils/metrics";
-import { latestParticulateDay, particulatePeriodMax, particulateReadingMax } from "../utils/particulateDay";
+import { particulateReadingMax, prepareParticulateReadings } from "../utils/particulateReadings";
 
 const COLUMN_WIDTH = 32;
 const AXIS_WIDTH = 52;
@@ -39,7 +39,7 @@ function ReadingDetails({ reading, timeZone, unit, left }) {
 }
 
 function ScrollableReadings({
-  readings, axis, timeZone, kind, seriesKeys, unit, scrollRef, setScaleRange, children,
+  readings, axis, timeZone, multipleDates, kind, seriesKeys, unit, scrollRef, setScaleRange, children,
 }) {
   const followLatest = useRef(true);
   const previousReadings = useRef(readings);
@@ -48,9 +48,14 @@ function ScrollableReadings({
   const [activeId, setActiveId] = useState(null);
   const scrollId = useId();
   const hintId = useId();
-  const hour = useMemo(
-    () => new Intl.DateTimeFormat("pt-BR", { timeZone, hour: "2-digit", minute: "2-digit" }),
-    [timeZone],
+  const tickTime = useMemo(
+    () => new Intl.DateTimeFormat("pt-BR", {
+      timeZone,
+      ...(multipleDates ? { day: "2-digit", month: "2-digit" } : {}),
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+    [timeZone, multipleDates],
   );
 
   const updateViewport = useCallback((element, scrolling = false) => {
@@ -106,14 +111,16 @@ function ScrollableReadings({
   }
 
   const last = readings.length - 1;
-  const active = activeId === null ? -1 : readings.findIndex(({ id }) => id === activeId);
   const { start: visibleStart, end: visibleEnd, plotWidth } = visibleReadingRange(
     viewport.left,
     viewport.width,
   );
   const firstRendered = Math.max(0, visibleStart - OVERSCAN);
   const rendered = readings.slice(firstRendered, visibleEnd + OVERSCAN);
+  const activeOffset = activeId === null ? -1 : rendered.findIndex(({ id }) => id === activeId);
+  const active = activeOffset < 0 ? -1 : firstRendered + activeOffset;
   const top = axis.domain[1];
+  const labelMargin = multipleDates ? 33 : 16;
   const showDetails = active >= visibleStart && active < visibleEnd;
 
   function goTo(index) {
@@ -169,7 +176,7 @@ function ScrollableReadings({
             {rendered.map((reading, offset) => {
               const index = firstRendered + offset;
               const center = (index + 0.5) * COLUMN_WIDTH - viewport.left;
-              const showHour = index % 3 === 0 && center >= 16 && center <= plotWidth - 16;
+              const showHour = index % 3 === 0 && center >= labelMargin && center <= plotWidth - labelMargin;
               return (
                 <button
                   type="button"
@@ -192,7 +199,7 @@ function ScrollableReadings({
                       <i key={key} style={{ height: `${difference / top * 100}%`, background: metrics[key].color }} />
                     ))}
                   </span>
-                  {showHour && <span className="pm-day-hour" aria-hidden="true">{hour.format(reading.time)}</span>}
+                  {showHour && <span className="pm-day-hour" aria-hidden="true">{tickTime.format(reading.time)}</span>}
                 </button>
               );
             })}
@@ -230,7 +237,7 @@ function ScrollableReadings({
   );
 }
 
-export default function ParticulateDayChart({ rows, station, timeZone, kind = "PM" }) {
+export default function ParticulateReadingChart({ rows, station, timeZone, kind = "PM" }) {
   const scrollRef = useRef(null);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState("");
@@ -239,19 +246,21 @@ export default function ParticulateDayChart({ rows, station, timeZone, kind = "P
   const seriesKeys = kind === "NC" ? NC_KEYS : PM_KEYS;
   const unit = metrics[seriesKeys[0]].unit;
   const title = `Particulados ${kind} por leitura`;
-  const { date, readings, max, hasMissing } = useMemo(
-    () => latestParticulateDay(rows, timeZone, seriesKeys),
-    [rows, timeZone, seriesKeys],
+  const { readings, max, hasData, hasMissing } = useMemo(
+    () => prepareParticulateReadings(rows, seriesKeys),
+    [rows, seriesKeys],
   );
-  const periodMax = useMemo(
-    () => fixedPeriodScale ? particulatePeriodMax(rows, seriesKeys) : null,
-    [fixedPeriodScale, rows, seriesKeys],
-  );
-  const scaleMax = periodMax ?? (scaleRange
-    ? particulateReadingMax(readings.slice(scaleRange.start, scaleRange.end))
-    : max);
+  const dateRange = useMemo(() => {
+    if (!readings.length) return { label: "", multipleDates: false };
+    const dateFormat = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone });
+    const first = dateFormat.format(readings[0].time);
+    const last = dateFormat.format(readings.at(-1).time);
+    return { label: first === last ? first : `${first} a ${last}`, multipleDates: first !== last };
+  }, [readings, timeZone]);
+  const scaleMax = fixedPeriodScale || !scaleRange
+    ? max
+    : particulateReadingMax(readings.slice(scaleRange.start, scaleRange.end));
   const axis = integerAxis([0, scaleMax]);
-  const hasData = readings.some(({ complete }) => complete);
 
   async function save() {
     setExporting(true);
@@ -265,7 +274,6 @@ export default function ParticulateDayChart({ rows, station, timeZone, kind = "P
         seriesKeys,
         title,
         station,
-        date,
         timeZone,
         unit,
       });
@@ -281,7 +289,7 @@ export default function ParticulateDayChart({ rows, station, timeZone, kind = "P
       <div className="chart-heading">
         <div>
           <h3>{title}</h3>
-          <small>{date} · {unit} · {readings.length.toLocaleString("pt-BR")} leituras</small>
+          <small>{dateRange.label} · {unit} · {readings.length.toLocaleString("pt-BR")} leituras</small>
         </div>
         <button
           type="button"
@@ -298,10 +306,10 @@ export default function ParticulateDayChart({ rows, station, timeZone, kind = "P
       {hasData ? (
         <>
           <ScrollableReadings
-            key={`${kind}:${date}`}
             readings={readings}
             axis={axis}
             timeZone={timeZone}
+            multipleDates={dateRange.multipleDates}
             kind={kind}
             seriesKeys={seriesKeys}
             unit={unit}
@@ -320,7 +328,7 @@ export default function ParticulateDayChart({ rows, station, timeZone, kind = "P
           {hasMissing && <p className="chart-note">Leituras com dados incompletos ou inconsistentes aparecem sem barra.</p>}
         </>
       ) : (
-        <div className="metric-empty">Não há leituras de {kind} com valores completos e cumulativos neste dia.</div>
+        <div className="metric-empty">Não há leituras de {kind} com valores completos e cumulativos neste período.</div>
       )}
       {error && <p role="alert" className="error-text">{error}</p>}
     </section>
