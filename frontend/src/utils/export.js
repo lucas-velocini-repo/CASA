@@ -1,4 +1,4 @@
-import { metrics } from "./metrics.js";
+import { formatValue, metrics } from "./metrics.js";
 import { formatTimestamp, TIME_ZONE } from "./dates.js";
 
 export function download(blob, filename) {
@@ -73,6 +73,98 @@ export function exportCsv(
     }),
     `${safeFilename(name)}.csv`,
   );
+}
+
+async function downloadPng(canvas, filename) {
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  if (!blob) throw new Error("Não foi possível gerar a imagem.");
+  download(blob, `${safeFilename(filename)}.png`);
+}
+
+export async function exportParticulateChart({
+  readings,
+  axis,
+  seriesKeys,
+  title,
+  station,
+  date,
+  timeZone,
+  unit,
+}) {
+  if (!readings.length) throw new Error("O gráfico ainda não está pronto para exportar.");
+  const width = Math.max(900, 100 + readings.length * 24);
+  const height = 506;
+  const canvas = document.createElement("canvas");
+  canvas.width = width * 2;
+  canvas.height = height * 2;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Não foi possível gerar a imagem.");
+  context.scale(2, 2);
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, width, height);
+
+  const from = formatTimestamp(readings[0].time, false, timeZone, true);
+  const to = formatTimestamp(readings.at(-1).time, false, timeZone, true);
+  context.fillStyle = "#153449";
+  context.font = "bold 17px Arial, sans-serif";
+  context.fillText(title, 18, 27);
+  context.font = "12px Arial, sans-serif";
+  context.fillText(station, 18, 48, width - 36);
+  context.fillText(`Trecho visível · ${from} — ${to}`, 18, 67);
+  context.fillText(`Fuso: ${timeZone} · ${unit}`, 18, 86);
+
+  let legendX = 18;
+  for (const key of seriesKeys) {
+    context.fillStyle = metrics[key].color;
+    context.fillRect(legendX, 101, 11, 8);
+    context.fillStyle = "#153449";
+    context.fillText(metrics[key].label, legendX + 16, 109);
+    legendX += 30 + context.measureText(metrics[key].label).width;
+  }
+
+  const left = 72;
+  const right = width - 24;
+  const bottom = 464;
+  const plotHeight = 328;
+  const scale = plotHeight / axis.domain[1];
+  context.fillStyle = "#536b73";
+  context.strokeStyle = "#dce8e5";
+  context.setLineDash([3, 4]);
+  context.textAlign = "right";
+  for (const tick of axis.ticks) {
+    const y = bottom - tick * scale;
+    context.beginPath();
+    context.moveTo(left, y);
+    context.lineTo(right, y);
+    context.stroke();
+    context.fillText(formatValue(tick), left - 8, y + 4);
+  }
+
+  const slot = (right - left) / readings.length;
+  const barWidth = Math.min(36, slot - 6);
+  const tickInterval = Math.max(1, Math.ceil(64 / slot));
+  const clock = new Intl.DateTimeFormat("pt-BR", {
+    timeZone, hour: "2-digit", minute: "2-digit", second: "2-digit",
+  });
+  context.textAlign = "center";
+  readings.forEach(({ time, complete, bands }, index) => {
+    const x = left + (index + 0.5) * slot;
+    if (complete) {
+      let y = bottom;
+      for (const { key, difference } of bands) {
+        const bandHeight = difference * scale;
+        y -= bandHeight;
+        context.fillStyle = metrics[key].color;
+        context.fillRect(x - barWidth / 2, y, barWidth, bandHeight);
+      }
+    }
+    if (index % tickInterval === 0) {
+      context.fillStyle = "#536b73";
+      context.fillText(clock.format(time), x, bottom + 19);
+    }
+  });
+
+  await downloadPng(canvas, `${station}_${title}_${date.replaceAll("/", "-")}`);
 }
 
 export async function exportChart(
@@ -158,11 +250,7 @@ export async function exportChart(
     const context = canvas.getContext("2d");
     context.scale(2, 2);
     context.drawImage(img, 0, 0);
-    const blob = await new Promise((resolve) =>
-      canvas.toBlob(resolve, "image/png"),
-    );
-    if (!blob) throw new Error("Não foi possível gerar a imagem.");
-    download(blob, `${safeFilename(filename)}.png`);
+    await downloadPng(canvas, filename);
   } finally {
     URL.revokeObjectURL(url);
   }

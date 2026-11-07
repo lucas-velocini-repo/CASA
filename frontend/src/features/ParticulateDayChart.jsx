@@ -1,13 +1,23 @@
 import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ChevronFirst, ChevronLast } from "lucide-react";
+import { ChevronFirst, ChevronLast, Download } from "lucide-react";
 import { integerAxis } from "../utils/chartAxes";
 import { formatTimestamp } from "../utils/dates";
+import { exportParticulateChart } from "../utils/export";
 import { formatValue, metrics, NC_KEYS, PM_KEYS } from "../utils/metrics";
 import { latestParticulateDay } from "../utils/particulateDay";
 
 const COLUMN_WIDTH = 32;
 const AXIS_WIDTH = 52;
 const OVERSCAN = 3;
+
+function visibleReadingRange(left, width) {
+  const plotWidth = Math.max(0, width - AXIS_WIDTH);
+  return {
+    start: Math.floor(left / COLUMN_WIDTH),
+    end: Math.ceil((left + plotWidth) / COLUMN_WIDTH),
+    plotWidth,
+  };
+}
 
 function ReadingDetails({ reading, timeZone, unit, left }) {
   return (
@@ -27,8 +37,7 @@ function ReadingDetails({ reading, timeZone, unit, left }) {
   );
 }
 
-function ScrollableReadings({ readings, max, timeZone, kind, seriesKeys, unit }) {
-  const scrollRef = useRef(null);
+function ScrollableReadings({ readings, axis, timeZone, kind, seriesKeys, unit, scrollRef }) {
   const followLatest = useRef(true);
   const previousReadings = useRef(readings);
   const [viewport, setViewport] = useState({ left: 0, width: 0 });
@@ -60,7 +69,7 @@ function ScrollableReadings({ readings, max, timeZone, kind, seriesKeys, unit })
     }
     previousReadings.current = readings;
     updateViewport(element);
-  }, [readings]);
+  }, [readings, scrollRef]);
 
   useLayoutEffect(() => {
     const element = scrollRef.current;
@@ -70,7 +79,7 @@ function ScrollableReadings({ readings, max, timeZone, kind, seriesKeys, unit })
     });
     observer.observe(element);
     return () => observer.disconnect();
-  }, []);
+  }, [scrollRef]);
 
   function onScroll(event) {
     const element = event.currentTarget;
@@ -80,12 +89,12 @@ function ScrollableReadings({ readings, max, timeZone, kind, seriesKeys, unit })
 
   const last = readings.length - 1;
   const active = activeId === null ? -1 : readings.findIndex(({ id }) => id === activeId);
-  const visibleStart = Math.floor(viewport.left / COLUMN_WIDTH);
-  const plotWidth = Math.max(0, viewport.width - AXIS_WIDTH);
-  const visibleEnd = Math.ceil((viewport.left + plotWidth) / COLUMN_WIDTH);
+  const { start: visibleStart, end: visibleEnd, plotWidth } = visibleReadingRange(
+    viewport.left,
+    viewport.width,
+  );
   const firstRendered = Math.max(0, visibleStart - OVERSCAN);
   const rendered = readings.slice(firstRendered, visibleEnd + OVERSCAN);
-  const axis = integerAxis([0, max]);
   const top = axis.domain[1];
   const showDetails = active >= visibleStart && active < visibleEnd;
 
@@ -200,37 +209,80 @@ function ScrollableReadings({ readings, max, timeZone, kind, seriesKeys, unit })
   );
 }
 
-export default function ParticulateDayChart({ rows, timeZone, kind = "PM" }) {
+export default function ParticulateDayChart({ rows, station, timeZone, kind = "PM" }) {
+  const scrollRef = useRef(null);
+  const [exporting, setExporting] = useState(false);
+  const [error, setError] = useState("");
   const seriesKeys = kind === "NC" ? NC_KEYS : PM_KEYS;
   const unit = metrics[seriesKeys[0]].unit;
+  const title = `Particulados ${kind} por leitura`;
   const { date, readings, max, hasMissing } = useMemo(
     () => latestParticulateDay(rows, timeZone, seriesKeys),
     [rows, timeZone, seriesKeys],
   );
+  const axis = integerAxis([0, max]);
+  const hasData = readings.some(({ complete }) => complete);
+
+  async function save() {
+    setExporting(true);
+    setError("");
+    try {
+      const { scrollLeft, clientWidth } = scrollRef.current;
+      const { start, end, plotWidth } = visibleReadingRange(scrollLeft, clientWidth);
+      await exportParticulateChart({
+        readings: plotWidth > 0 ? readings.slice(start, end) : [],
+        axis,
+        seriesKeys,
+        title,
+        station,
+        date,
+        timeZone,
+        unit,
+      });
+    } catch (err) {
+      setError(err.message || "Não foi possível salvar o gráfico.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <section className="chart-card pm-day-card">
       <div className="chart-heading">
         <div>
-          <h3>Particulados {kind} por leitura</h3>
+          <h3>{title}</h3>
           <small>{date} · {unit} · {readings.length.toLocaleString("pt-BR")} leituras</small>
         </div>
+        <button
+          type="button"
+          className="icon-button"
+          disabled={!hasData || exporting}
+          onClick={save}
+          title="Salvar trecho visível em PNG"
+          aria-label={`Salvar gráfico de ${title} em PNG`}
+        >
+          <Download size={17} aria-hidden="true" />
+          <span>{exporting ? "Salvando…" : "PNG"}</span>
+        </button>
       </div>
-      {readings.some(({ complete }) => complete) ? (
+      {hasData ? (
         <>
           <ScrollableReadings
             key={`${kind}:${date}`}
             readings={readings}
-            max={max}
+            axis={axis}
             timeZone={timeZone}
             kind={kind}
             seriesKeys={seriesKeys}
             unit={unit}
+            scrollRef={scrollRef}
           />
           {hasMissing && <p className="chart-note">Leituras com dados incompletos ou inconsistentes aparecem sem barra.</p>}
         </>
       ) : (
         <div className="metric-empty">Não há leituras de {kind} com valores completos e cumulativos neste dia.</div>
       )}
+      {error && <p role="alert" className="error-text">{error}</p>}
     </section>
   );
 }

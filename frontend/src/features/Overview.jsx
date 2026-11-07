@@ -65,7 +65,7 @@ export default function Overview({ rows, station, period, timeZone }) {
           period={period}
           timeZone={timeZone}
         />
-        <ParticulateDayChart rows={rows} timeZone={timeZone} />
+        <ParticulateDayChart rows={rows} station={station} timeZone={timeZone} />
       </div>
     </>
   );
