@@ -10,6 +10,7 @@ import {
 import {
   metrics,
   formatValue,
+  formatParticulateValue,
   particulateBands,
   formatParticulateDifference,
   PM_KEYS,
@@ -68,7 +69,7 @@ export default function ParticulateSnapshot({ reading, timeZone }) {
                     labelFormatter={() => "Concentração acumulada"}
                     itemSorter={({ dataKey }) => PM_KEYS.indexOf(dataKey)}
                     formatter={(_, name, { dataKey }) => [
-                      `${formatValue(reading.values[dataKey])} µg/m³`,
+                      `${formatParticulateValue(reading.values[dataKey])} µg/m³`,
                       name,
                     ]}
                   />
@@ -96,7 +97,7 @@ export default function ParticulateSnapshot({ reading, timeZone }) {
               <div key={key}>
                 <dt><i style={{ background: metrics[key].color }} />{metrics[key].label}</dt>
                 <dd>
-                  {formatValue(value)} <small>µg/m³ acumulados</small>
+                  {formatParticulateValue(value)} <small>µg/m³ acumulados</small>
                 </dd>
                 <dd className="snapshot-difference">
                   Diferença: {formatParticulateDifference(difference)} µg/m³

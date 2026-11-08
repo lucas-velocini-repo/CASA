@@ -3,7 +3,7 @@ import { ChevronFirst, ChevronLast, Download } from "lucide-react";
 import { integerAxis } from "../utils/chartAxes";
 import { formatTimestamp } from "../utils/dates";
 import { exportParticulateChart } from "../utils/export";
-import { formatValue, metrics, NC_KEYS, PM_KEYS } from "../utils/metrics";
+import { formatParticulateValue, formatValue, metrics, NC_KEYS, PM_KEYS } from "../utils/metrics";
 import { particulateReadingMax, prepareParticulateReadings } from "../utils/particulateReadings";
 
 const COLUMN_WIDTH = 32;
@@ -29,7 +29,7 @@ function ReadingDetails({ reading, timeZone, unit, left }) {
         {[...reading.bands].reverse().map(({ key, value }) => (
           <div key={key}>
             <dt style={{ color: metrics[key].color }}>{metrics[key].label}</dt>
-            <dd>{formatValue(value)}</dd>
+            <dd>{formatParticulateValue(value)}</dd>
           </div>
         ))}
       </dl>

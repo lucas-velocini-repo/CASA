@@ -12,12 +12,17 @@ import {
 import {
   metrics,
   formatValue,
+  formatMeasurement,
   automaticDomain,
   chartRows,
+  PM_KEYS,
+  NC_KEYS,
 } from "../utils/metrics";
 import { integerAxis } from "../utils/chartAxes";
 import { formatTimestamp } from "../utils/dates";
 import { exportChart } from "../utils/export";
+
+const metricKey = ({ dataKey }) => dataKey.slice("values.".length);
 
 export default function MeasurementChart({
   rows,
@@ -41,6 +46,7 @@ export default function MeasurementChart({
     keys.some((key) => Number.isFinite(row.values?.[key])),
   );
   const reduced = data.length < rows.length;
+  const particulate = keys === PM_KEYS || keys === NC_KEYS;
   async function save() {
     setExporting(true);
     setError("");
@@ -131,7 +137,8 @@ export default function MeasurementChart({
                   labelFormatter={(value) =>
                     formatTimestamp(value, false, timeZone)
                   }
-                  formatter={(value, name) => [formatValue(value), name]}
+                  itemSorter={particulate ? (item) => -keys.indexOf(metricKey(item)) : "name"}
+                  formatter={(value, name, item) => [formatMeasurement(value, metricKey(item)), name]}
                   contentStyle={{
                     borderRadius: 10,
                     border: "1px solid #dce8e5",

@@ -25,6 +25,7 @@ export const metrics = {
 
 export const PM_KEYS = ["pm1", "pm25", "pm4", "pm10"];
 export const NC_KEYS = ["nc05", "nc10", "nc25", "nc40", "nc100"];
+const particulateKeys = new Set([...PM_KEYS, ...NC_KEYS, "typical_particle_size"]);
 
 export const tabs = [
   { id: "overview", label: "Visão geral" },
@@ -43,15 +44,30 @@ export function formatValue(value) {
     : "—";
 }
 
+const particulateFormat = new Intl.NumberFormat("pt-BR", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+export function formatParticulateValue(value) {
+  return Number.isFinite(value) ? particulateFormat.format(value) : "—";
+}
+
+export function formatMeasurement(value, key) {
+  return particulateKeys.has(key) ? formatParticulateValue(value) : formatValue(value);
+}
+
 export function automaticDomain(rows, keys) {
+  const humidity = keys.length === 1 && keys[0] === "humidity";
   let min = Infinity;
   let max = -Infinity;
   for (const row of rows)
     for (const key of keys) {
       const value = row.values?.[key];
       if (Number.isFinite(value)) {
-        min = Math.min(min, value);
-        max = Math.max(max, value);
+        const axisValue = humidity ? Math.max(0, Math.min(100, value)) : value;
+        min = Math.min(min, axisValue);
+        max = Math.max(max, axisValue);
       }
     }
   if (!Number.isFinite(min)) return [0, 1];
@@ -61,6 +77,7 @@ export function automaticDomain(rows, keys) {
     0.01,
   );
   if (keys.includes("temperature")) return [min - padding, max + padding];
+  if (humidity) return [Math.max(0, min - padding), Math.min(100, max + padding)];
   return [Math.max(0, min - padding), Math.max(0, max + padding)];
 }
 
@@ -108,8 +125,8 @@ export function particulateBands(values, keys = PM_KEYS) {
 }
 
 export function formatParticulateDifference(value) {
-  const formatted = formatValue(value);
-  return value > 0 && formatted === "0" ? "< 0,1" : formatted;
+  // Subtraction can put an exact hundredth slightly below the threshold.
+  return value > 0 && value + 1e-12 < 0.01 ? "< 0,01" : formatParticulateValue(value);
 }
 export const OVERVIEW_KEYS = [
   "temperature",

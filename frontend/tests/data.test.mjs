@@ -6,6 +6,7 @@ import {
   automaticDomain,
   chartRows,
   formatValue,
+  formatMeasurement,
   particulateBands,
   formatParticulateDifference,
   NC_KEYS,
@@ -142,6 +143,17 @@ test("non-negative charts start no lower than zero, while temperature can be neg
   const domain = automaticDomain([{ values: { temperature: -1 } }], ["temperature"]);
   assert.ok(integerAxis(domain).ticks[0] < 0);
 });
+test("humidity ticks stay within zero and 100 even with out-of-range readings", () => {
+  for (const readings of [[98.8, 100], [100], [110], [-2, 99], [-4]]) {
+    const rows = readings.map((humidity) => ({ values: { humidity } }));
+    const domain = automaticDomain(rows, ["humidity"]);
+    for (const bounds of [domain, [0, domain[1]]]) {
+      const { ticks } = integerAxis(bounds);
+      assert.ok(ticks.every((value) => value >= 0 && value <= 100));
+      if (Math.max(...readings) >= 100) assert.equal(ticks.at(-1), 100);
+    }
+  }
+});
 test("measurement display rounds to one decimal and latest reading can show seconds", () => {
   assert.deepEqual([3.456, 3.4, 3, null].map(formatValue), ["3,5", "3,4", "3", "—"]);
   assert.match(formatTimestamp("2026-09-19T03:12:34Z", false, "UTC", true), /03:12:34/);
@@ -151,10 +163,16 @@ test("PM segments use adjacent cumulative differences and flag missing or decrea
   assert.deepEqual(differences({ pm1: 2, pm25: 5, pm4: 5, pm10: 6.5 }), [2, 3, 0, 1.5]);
   assert.deepEqual(differences({ pm1: 0, pm4: 5, pm10: 4 }), [0, null, null, null]);
 });
-test("PM differences distinguish exact zero from positive values that round to zero", () => {
+test("PM and NC measurements use two decimal places, including particle size", () => {
+  assert.equal(formatMeasurement(3, "pm10"), "3,00");
+  assert.equal(formatMeasurement(3.456, "nc05"), "3,46");
+  assert.equal(formatMeasurement(0.42, "typical_particle_size"), "0,42");
+  assert.equal(formatMeasurement(99.912, "humidity"), "99,9");
+});
+test("PM differences distinguish exact zero from positive values below 0.01", () => {
   assert.deepEqual(
-    [0, 0.01, 0.05, 0.123, null].map(formatParticulateDifference),
-    ["0", "< 0,1", "0,1", "0,1", "—"],
+    [0, 0.001, 0.009, 0.01, 2.01 - 2, 0.123, null].map(formatParticulateDifference),
+    ["0,00", "< 0,01", "< 0,01", "0,01", "0,01", "0,12", "—"],
   );
 });
 test("PM columns keep readings across midnight and distinguish incomplete readings from zero", () => {

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { metrics, formatValue } from "../utils/metrics";
+import { metrics, formatMeasurement } from "../utils/metrics";
 import { formatTimestamp } from "../utils/dates";
 
 const PAGE_SIZE = 50;
@@ -48,7 +48,7 @@ export default function HistoryTable({ rows, timeZone }) {
                   {formatTimestamp(row.timestamp, false, timeZone)}
                 </th>
                 {keys.map((key) => (
-                  <td key={key}>{formatValue(row.values?.[key])}</td>
+                  <td key={key}>{formatMeasurement(row.values?.[key], key)}</td>
                 ))}
               </tr>
             ))}
