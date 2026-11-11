@@ -51,6 +51,10 @@ class Measurement(Base):
         Float,
         nullable=True,
     )
+    location_id: Mapped[int | None] = mapped_column(
+        ForeignKey("measurement_locations.id", name="fk_measurements_location_id", ondelete="SET NULL")
+    )
+    location_fallback_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     device = relationship(
         "Device"
@@ -75,5 +79,12 @@ class Measurement(Base):
 Index(
     "ix_measurements_device_timestamp",
     Measurement.device_id,
+    Measurement.timestamp,
+)
+
+Index(
+    "ix_measurements_device_location_timestamp",
+    Measurement.device_id,
+    Measurement.location_id,
     Measurement.timestamp,
 )

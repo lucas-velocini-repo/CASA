@@ -7,13 +7,14 @@ import logo from "../assets/t2p-logo.png";
 import StationHeader from "./components/StationHeader";
 import StationSelector from "./components/StationSelector";
 import PeriodFilter from "./components/PeriodFilter";
+import LocationFilter from "./components/LocationFilter";
 import StatusPanel from "./components/StatusPanel";
 import Overview from "./features/Overview";
 import HistoryTable from "./features/HistoryTable";
 import MeasurementChart from "./features/MeasurementChart";
 import ParticulateReadingChart from "./features/ParticulateReadingChart";
 import { usePolling } from "./hooks/usePolling";
-import { fetchHistory, fetchStations } from "./services/api";
+import { fetchHistory, fetchLocations, fetchStations } from "./services/api";
 import { tabs, exportKeys } from "./utils/metrics";
 import {
   initialPeriod,
@@ -27,12 +28,22 @@ function StationData({ device, latest, timeZone }) {
   const [period, setPeriod] = useState(() => initialPeriod(timeZone));
   const [tab, setTab] = useState("overview");
   const [revision, setRevision] = useState(0);
+  const [locationRevision, setLocationRevision] = useState(0);
+  const [locationsByStation, setLocationsByStation] = useState({});
+  const deviceId = device.device_id;
+  const loadLocations = useCallback((signal) => fetchLocations(deviceId, signal), [deviceId]);
+  const locations = usePolling(
+    `locations:${deviceId}`, loadLocations, 60_000, `${revision}:${locationRevision}`,
+  );
+  const latestLocationId = locations.data?.[0]?.location_id;
+  const defaultLocationId = locations.status === "loading" ? null : String(latestLocationId ?? "");
+  const locationId = locationsByStation[deviceId] ?? defaultLocationId;
   const { start, end } = periodBounds(period, timeZone);
   const load = useCallback(
-    (signal) => fetchHistory(device.device_id, { start, end }, signal),
-    [device.device_id, start, end],
+    (signal) => fetchHistory(deviceId, { start, end, locationId }, signal),
+    [deviceId, start, end, locationId],
   );
-  const requestKey = `${device.device_id}:${start}:${end}:${revision}`;
+  const requestKey = locationId === null ? null : `${deviceId}:${start}:${end}:${locationId}:${revision}`;
   const history = usePolling(requestKey, load, 60_000);
   const rows = history.data || [];
   const definition = tabs.find((item) => item.id === tab);
@@ -54,7 +65,20 @@ function StationData({ device, latest, timeZone }) {
         ))}
       </nav>
       <div className="content-body">
-        <PeriodFilter value={period} onApply={setPeriod} timeZone={timeZone} />
+        <PeriodFilter value={period} onApply={setPeriod} timeZone={timeZone}>
+          <LocationFilter
+            key={deviceId}
+            deviceId={deviceId}
+            value={locationId}
+            onChange={(value) => setLocationsByStation((previous) => ({ ...previous, [deviceId]: value }))}
+            locations={locations}
+            onSaved={(savedLocationId, refreshHistory) => {
+              setLocationsByStation((previous) => ({ ...previous, [deviceId]: String(savedLocationId) }));
+              if (refreshHistory) setRevision((value) => value + 1);
+              else setLocationRevision((value) => value + 1);
+            }}
+          />
+        </PeriodFilter>
         <div className="data-toolbar">
           <div>
             <strong>{label}</strong>
@@ -80,7 +104,7 @@ function StationData({ device, latest, timeZone }) {
               onClick={() =>
                 exportCsv(
                   rows,
-                  `${name}_${tab}_${period.startDate}_${period.endDate}`,
+                  `${name}_${tab}_${period.startDate}_${period.endDate}${locationId ? `_local-${locationId}` : ""}`,
                   timeZone,
                   exportKeys(tab),
                 )
@@ -105,7 +129,7 @@ function StationData({ device, latest, timeZone }) {
           />
         ) : tab === "history" ? (
           <HistoryTable
-            key={`${device.device_id}:${start}:${end}`}
+            key={`${deviceId}:${start}:${end}:${locationId}`}
             rows={rows}
             timeZone={timeZone}
           />

@@ -394,11 +394,22 @@ small,
 .content-body {
   padding: 24px 28px 28px;
 }
-.period-filter {
+.filter-card {
   background: #f7faf8;
   border: 1px solid #e3ece6;
   border-radius: 10px;
   padding: 17px 18px;
+}
+.filter-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 650;
+}
+.filter-title svg {
+  color: var(--green);
 }
 .filter-heading {
   display: flex;
@@ -417,6 +428,16 @@ small,
 .filter-heading small {
   font-size: 10px;
 }
+.filter-layout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 18px;
+}
+.period-filter {
+  flex: 1 1 600px;
+  min-width: 0;
+}
 .filter-fields {
   display: flex;
   align-items: flex-end;
@@ -429,7 +450,8 @@ small,
   min-width: 0;
 }
 .date-field > label,
-.time-field {
+.time-field,
+.location-field {
   font-size: 11px;
   font-weight: 550;
   color: #526970;
@@ -465,7 +487,8 @@ small,
   min-height: 40px;
   cursor: pointer;
 }
-.time-field {
+.time-field,
+.location-field {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -473,6 +496,50 @@ small,
 .time-field input {
   font-size: 12px;
   width: 114px;
+}
+.location-controls > select {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  border: 1px solid #d4e0db;
+  background: white;
+  border-radius: 7px;
+  padding: 6px 10px;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  text-overflow: ellipsis;
+}
+.location-field {
+  flex: 0 1 260px;
+  min-width: 0;
+  margin-left: auto;
+}
+.location-field > label {
+  color: #244c52;
+  font-size: 13px;
+  font-weight: 700;
+}
+.location-controls {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.location-name-button {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+}
+.location-name-button:hover {
+  background: #edf7f4;
+  color: var(--green-dark);
 }
 .apply {
   font-size: 12px;
@@ -914,7 +981,7 @@ tbody tr:nth-child(even) {
   .content-body {
     padding: 16px 12px;
   }
-  .period-filter {
+  .filter-card {
     padding: 14px 12px;
   }
   .filter-heading {
@@ -926,6 +993,15 @@ tbody tr:nth-child(even) {
     display: grid;
     grid-template-columns: 1fr;
     gap: 12px;
+  }
+  .period-filter,
+  .location-field {
+    flex: 1 1 100%;
+    margin-left: 0;
+  }
+  .location-name-button {
+    width: 44px;
+    height: 44px;
   }
   .date-field {
     width: 100%;
@@ -943,6 +1019,9 @@ tbody tr:nth-child(even) {
   }
   .time-field input {
     width: 100%;
+    min-height: 44px;
+  }
+  .location-controls > select {
     min-height: 44px;
   }
   .apply {
@@ -1097,6 +1176,45 @@ tbody tr:nth-child(even) {
   gap: 8px;
   margin-top: 24px;
   flex-wrap: wrap;
+}
+.location-dialog .settings-heading {
+  gap: 12px;
+}
+.location-dialog input {
+  width: 100%;
+  margin-bottom: 16px;
+}
+.location-dialog .error-text {
+  display: block;
+  margin-top: 10px;
+}
+.linked-locations {
+  margin-top: 16px;
+}
+.linked-locations h3 {
+  font-size: 13px;
+}
+.linked-locations ul {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+.linked-locations li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.linked-locations li span {
+  overflow-wrap: anywhere;
+}
+.linked-locations li button {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  font-size: 12px;
 }
 
 /* Focus belongs to the whole search control, including its icon. */

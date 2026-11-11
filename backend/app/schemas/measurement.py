@@ -1,5 +1,9 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 from datetime import datetime
+from typing import Annotated, Literal
+
+
+LocationFilter = int | Literal["unknown"]
 
 
 class ParticulateMass(BaseModel):
@@ -71,5 +75,35 @@ class MeasurementDataResponse(BaseModel):
 
     latitude: float | None
     longitude: float | None
+    location_id: int | None = None
 
     values: SensorValuesResponse
+
+
+class MeasurementLocationSummary(BaseModel):
+    location_id: int
+    latitude: float
+    longitude: float
+    name: str | None = None
+
+
+class MeasurementLocationResponse(MeasurementLocationSummary):
+    links: list[MeasurementLocationSummary] = Field(default_factory=list)
+    grouped: bool = False
+
+
+LocationName = Annotated[
+    str, StringConstraints(strip_whitespace=True, max_length=80, pattern=r"^[^\x00]*$")
+]
+
+
+class MeasurementLocationNameUpdate(BaseModel):
+    name: LocationName | None
+
+
+class MeasurementLocationLinkUpdate(BaseModel):
+    name: Annotated[LocationName, Field(min_length=1)]
+
+
+class MeasurementLocationSelection(BaseModel):
+    location_id: int

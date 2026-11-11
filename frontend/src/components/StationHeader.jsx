@@ -1,4 +1,4 @@
-import { MapPin } from "lucide-react";
+import MapsLink from "./MapsLink";
 import StationStatus from "./StationStatus";
 import { formatTimestamp } from "../utils/dates";
 
@@ -18,16 +18,7 @@ export default function StationHeader({ device, latest, timeZone }) {
               : "Localização indisponível"}
           </span>
           {hasLocation && (
-            <a
-              className="maps-link"
-              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${device.latitude},${device.longitude}`)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Abrir localização no Google Maps (nova aba ou aplicativo)"
-              title="Abrir no Google Maps"
-            >
-              <MapPin size={15} aria-hidden="true" />
-            </a>
+            <MapsLink latitude={device.latitude} longitude={device.longitude} />
           )}
         </p>
       </div>

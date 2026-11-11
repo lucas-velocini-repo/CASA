@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 // A request key prevents data from an old station/period being displayed during a change.
 // A failed refresh clears the result so it cannot be exported as current/complete data.
-export function usePolling(key, loader, interval = 60_000) {
+export function usePolling(key, loader, interval = 60_000, refreshKey = null) {
   const [state, setState] = useState({
     key: null,
     status: "loading",
@@ -31,7 +31,7 @@ export function usePolling(key, loader, interval = 60_000) {
       controller.abort();
       clearTimeout(timer);
     };
-  }, [key, loader, interval]);
+  }, [key, loader, interval, refreshKey]);
   return state.key === key
     ? state
     : { status: "loading", data: null, error: null };

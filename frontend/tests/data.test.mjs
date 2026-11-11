@@ -79,11 +79,12 @@ test("loads >10,000 records without losing or duplicating inclusive page boundar
   let calls = 0;
   const result = await fetchHistory(
     "test",
-    { start, end },
+    { start, end, locationId: "42" },
     undefined,
     async (path) => {
       calls++;
       const p = new URL(path, "http://localhost").searchParams;
+      assert.equal(p.get("location_id"), "42");
       return rows
         .filter(
           (r) =>

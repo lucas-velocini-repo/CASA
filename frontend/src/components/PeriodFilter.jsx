@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarDays, SlidersHorizontal } from "lucide-react";
 import { initialPeriod, periodBounds, shiftDay, today } from "../utils/dates";
 
-export default function PeriodFilter({ value, onApply, timeZone }) {
+export default function PeriodFilter({ value, onApply, timeZone, children }) {
   const [draft, setDraft] = useState(value);
   const [error, setError] = useState("");
   const change = (key, value) => {
@@ -29,104 +29,112 @@ export default function PeriodFilter({ value, onApply, timeZone }) {
     setError("");
   }
   return (
-    <form className="period-filter" onSubmit={apply}>
+    <section className="filter-card" aria-labelledby="analysis-filters">
+      <h2 className="filter-title" id="analysis-filters">
+        <SlidersHorizontal size={17} aria-hidden="true" /> Filtros
+      </h2>
       <div className="filter-heading">
         <span>
-          <CalendarDays size={16} /> Período de análise
+          <CalendarDays size={15} aria-hidden="true" /> Período de análise
         </span>
         <small>{timeZone}</small>
       </div>
-      <div className="filter-fields">
-        {[
-          ["startDate", "Data inicial"],
-          ["endDate", "Data final"],
-        ].map(([key, label]) => (
-          <div className="date-field" key={key}>
-            <label htmlFor={key}>{label}</label>
-            <div className="date-control">
-              <button
-                type="button"
-                disabled={!draft[key]}
-                aria-label={`${label}: dia anterior`}
-                onClick={() => change(key, shiftDay(draft[key], -1))}
-              >
-                <ChevronLeft size={16} />
-              </button>
+      <div className="filter-layout">
+        <form className="period-filter" onSubmit={apply}>
+          <div className="filter-fields">
+            {[
+              ["startDate", "Data inicial"],
+              ["endDate", "Data final"],
+            ].map(([key, label]) => (
+              <div className="date-field" key={key}>
+                <label htmlFor={key}>{label}</label>
+                <div className="date-control">
+                  <button
+                    type="button"
+                    disabled={!draft[key]}
+                    aria-label={`${label}: dia anterior`}
+                    onClick={() => change(key, shiftDay(draft[key], -1))}
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <input
+                    id={key}
+                    type="date"
+                    required
+                    value={draft[key]}
+                    onChange={(e) => change(key, e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    disabled={!draft[key]}
+                    aria-label={`${label}: próximo dia`}
+                    onClick={() => change(key, shiftDay(draft[key], 1))}
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+            ))}
+            <label className="checkbox">
               <input
-                id={key}
-                type="date"
-                required
-                value={draft[key]}
-                onChange={(e) => change(key, e.target.value)}
-              />
-              <button
-                type="button"
-                disabled={!draft[key]}
-                aria-label={`${label}: próximo dia`}
-                onClick={() => change(key, shiftDay(draft[key], 1))}
-              >
-                <ChevronRight size={16} />
+                type="checkbox"
+                checked={draft.useTime}
+                onChange={(e) => change("useTime", e.target.checked)}
+              />{" "}
+              Filtrar por horário
+            </label>
+            {draft.useTime && (
+              <>
+                <label className="time-field">
+                  Hora inicial
+                  <input
+                    aria-label="Hora inicial"
+                    type="time"
+                    required
+                    value={draft.startTime}
+                    onChange={(e) => change("startTime", e.target.value)}
+                  />
+                </label>
+                <label className="time-field">
+                  Hora final
+                  <input
+                    aria-label="Hora final"
+                    type="time"
+                    required
+                    value={draft.endTime}
+                    onChange={(e) => change("endTime", e.target.value)}
+                  />
+                </label>
+              </>
+            )}
+            <button className="primary apply" type="submit">
+              Aplicar período
+            </button>
+          </div>
+          <div className="filter-bottom">
+            <div className="presets">
+              <button type="button" onClick={() => preset(1)}>
+                Hoje
+              </button>
+              <button type="button" onClick={() => preset(7)}>
+                Últimos 7 dias
+              </button>
+              <button type="button" onClick={() => preset(30)}>
+                Últimos 30 dias
               </button>
             </div>
+            {JSON.stringify(draft) !== JSON.stringify(value) && (
+              <small>Alterações ainda não aplicadas</small>
+            )}
           </div>
-        ))}
-        <label className="checkbox">
-          <input
-            type="checkbox"
-            checked={draft.useTime}
-            onChange={(e) => change("useTime", e.target.checked)}
-          />{" "}
-          Filtrar por horário
-        </label>
-        {draft.useTime && (
-          <>
-            <label className="time-field">
-              Hora inicial
-              <input
-                aria-label="Hora inicial"
-                type="time"
-                required
-                value={draft.startTime}
-                onChange={(e) => change("startTime", e.target.value)}
-              />
-            </label>
-            <label className="time-field">
-              Hora final
-              <input
-                aria-label="Hora final"
-                type="time"
-                required
-                value={draft.endTime}
-                onChange={(e) => change("endTime", e.target.value)}
-              />
-            </label>
-          </>
-        )}
-        <button className="primary apply" type="submit">
-          Aplicar período
-        </button>
+          {error && (
+            <p className="error-text" role="alert">
+              {error}
+            </p>
+          )}
+        </form>
+        {children}
       </div>
-      <div className="filter-bottom">
-        <div className="presets">
-          <button type="button" onClick={() => preset(1)}>
-            Hoje
-          </button>
-          <button type="button" onClick={() => preset(7)}>
-            Últimos 7 dias
-          </button>
-          <button type="button" onClick={() => preset(30)}>
-            Últimos 30 dias
-          </button>
-        </div>
-        {JSON.stringify(draft) !== JSON.stringify(value) && (
-          <small>Alterações ainda não aplicadas</small>
-        )}
-      </div>
-      {error && (
-        <p className="error-text" role="alert">
-          {error}
-        </p>
-      )}
-    </form>
+    </section>
   );
 }

@@ -1,5 +1,5 @@
 from fastapi import HTTPException
-from sqlalchemy import exists, or_, select
+from sqlalchemy import exists, or_, select, true
 
 from app.core.security import aware
 from app.models.accounts import DeviceAccess
@@ -20,7 +20,7 @@ def device_scope(user):
     )
 
 
-def measurement_scope(user):
+def measurement_scope(user, timestamp=Measurement.timestamp):
     if user.role == "admin":
         return True
     return exists(
@@ -28,10 +28,10 @@ def measurement_scope(user):
             DeviceAccess.user_id == user.id,
             DeviceAccess.device_id == Measurement.device_id,
             DeviceAccess.revoked_at.is_(None),
-            Measurement.timestamp >= DeviceAccess.data_from,
+            timestamp >= DeviceAccess.data_from,
             or_(
                 DeviceAccess.data_until.is_(None),
-                Measurement.timestamp < DeviceAccess.data_until,
+                timestamp < DeviceAccess.data_until,
             ),
         )
     )
@@ -45,6 +45,15 @@ def require_device(db, user, device_id):
         # Do not reveal whether another participant's station exists.
         raise HTTPException(404, "Estação não encontrada.")
     return device
+
+
+def measurement_location_scope(user):
+    if user.role == "admin":
+        return true()
+    return or_(
+        Measurement.location_fallback_at.is_(None),
+        measurement_scope(user, Measurement.location_fallback_at),
+    )
 
 
 def visible_device(db, user, device):

@@ -1,33 +1,78 @@
 from datetime import datetime, timezone
 
 from fastapi import HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 
+from app.core.security import aware
 from app.models.device import Device
 from app.models.measurement import Measurement
+from app.models.measurement_location import MeasurementLocation
 from app.models.sensor_value import SensorValue
 from app.models.accounts import Provisioning
-from app.services.access_service import measurement_scope, require_device
+from app.services.access_service import measurement_location_scope, measurement_scope, require_device
+from app.services.measurement_location_service import location_ids_for_filter
+from app.services.location_grouping import (
+    LOCATION_RADIUS_METERS,
+    add_reference_sample,
+    closest_location,
+    valid_coordinates,
+)
 
 from sqlalchemy.orm import Session, joinedload
 
 from sqlalchemy.exc import IntegrityError
 
 from app.schemas.measurement import (
+    LocationFilter,
     MeasurementCreate,
     MeasurementDataResponse,
     SensorValuesResponse,
 )
+
+def assign_measurement_location(db: Session, measurement: Measurement, device: Device):
+    latitude, longitude = measurement.latitude, measurement.longitude
+    fallback_at = None
+    if (
+        latitude is None
+        and longitude is None
+        and device.location_updated_at is not None
+        and aware(device.location_updated_at) <= measurement.timestamp
+    ):
+        latitude, longitude = device.latitude, device.longitude
+        fallback_at = device.location_updated_at
+    if not valid_coordinates(latitude, longitude):
+        return
+
+    locations = db.scalars(
+        select(MeasurementLocation).where(
+            MeasurementLocation.device_id == device.id, MeasurementLocation.area_id.is_(None)
+        )
+    )
+    location = closest_location(locations, latitude, longitude, LOCATION_RADIUS_METERS)
+    if location is None:
+        location = MeasurementLocation(
+            device_id=device.id, latitude=latitude, longitude=longitude, samples=[]
+        )
+        db.add(location)
+    add_reference_sample(location, latitude, longitude)
+    if location.id is None:
+        db.flush()
+    measurement.latitude, measurement.longitude = latitude, longitude
+    measurement.location_id = location.id
+    measurement.location_fallback_at = fallback_at
+
 
 def create_measurement(
     db: Session,
     data: MeasurementCreate,
 ) -> Measurement:
 
+    # Serialize grouping and location updates for this station.
     device = db.scalar(
-        select(Device).where(
-            Device.device_id == data.device_id
-        )
+        select(Device)
+        .where(Device.device_id == data.device_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
     )
 
     if device is None:
@@ -40,6 +85,14 @@ def create_measurement(
         data.timestamp,
         tz=timezone.utc,
     )
+
+    existing_measurement_query = select(Measurement).where(
+        Measurement.device_id == device.id,
+        Measurement.timestamp == timestamp,
+    )
+    existing_measurement = db.scalar(existing_measurement_query)
+    if existing_measurement is not None:
+        return existing_measurement
 
     measurement = Measurement(
         device_id=device.id,
@@ -68,27 +121,21 @@ def create_measurement(
         typical_particle_size=data.typical_size,
     )
 
-    device.last_seen = datetime.now(timezone.utc)
-
-    db.add(measurement)
-    pending = db.scalar(select(Provisioning).where(Provisioning.device_id == device.id))
-    if pending and not pending.confirmed_at:
-        pending.confirmed_at = datetime.now(timezone.utc)
-        pending.encrypted_token = None
-
     try:
+        assign_measurement_location(db, measurement, device)
+        device.last_seen = datetime.now(timezone.utc)
+        db.add(measurement)
+        pending = db.scalar(select(Provisioning).where(Provisioning.device_id == device.id))
+        if pending and not pending.confirmed_at:
+            pending.confirmed_at = datetime.now(timezone.utc)
+            pending.encrypted_token = None
         db.commit()
         db.refresh(measurement)
 
     except IntegrityError:
         db.rollback()
 
-        existing_measurement = db.scalar(
-            select(Measurement).where(
-                Measurement.device_id == device.id,
-                Measurement.timestamp == timestamp,
-            )
-        )
+        existing_measurement = db.scalar(existing_measurement_query)
 
         if existing_measurement is not None:
             return existing_measurement
@@ -99,6 +146,7 @@ def create_measurement(
 
 def measurement_to_response(
     measurement: Measurement,
+    show_location: bool,
 ) -> MeasurementDataResponse:
 
     values = measurement.sensor_values
@@ -112,8 +160,9 @@ def measurement_to_response(
         timestamp=measurement.timestamp,
         received_at=measurement.received_at,
 
-        latitude=measurement.latitude,
-        longitude=measurement.longitude,
+        latitude=measurement.latitude if show_location else None,
+        longitude=measurement.longitude if show_location else None,
+        location_id=measurement.location_id if show_location else None,
 
         values=SensorValuesResponse(
             temperature=values.temperature,
@@ -144,7 +193,7 @@ def get_measurement_history(
     start: datetime | None = None,
     end: datetime | None = None,
     limit: int = 1000,
-    *, user,
+    *, user, location_id: LocationFilter | None = None,
 ) -> list[MeasurementDataResponse]:
 
     device = require_device(db, user, device_id)
@@ -155,8 +204,9 @@ def get_measurement_history(
             detail="Device not registered",
         )
 
+    show_location = measurement_location_scope(user)
     query = (
-        select(Measurement)
+        select(Measurement, show_location)
         .options(
             joinedload(Measurement.device),
             joinedload(Measurement.sensor_values),
@@ -177,19 +227,21 @@ def get_measurement_history(
             Measurement.timestamp <= end
         )
 
+    if location_id == "unknown":
+        query = query.where(or_(Measurement.location_id.is_(None), ~show_location))
+    elif location_id is not None:
+        query = query.where(
+            Measurement.location_id.in_(location_ids_for_filter(device.id, user.id, location_id)),
+            show_location,
+        )
+
     query = query.order_by(
         Measurement.timestamp.desc()
     ).limit(limit)
 
-    measurements = list(
-        db.scalars(query).all()
-    )
-
-    measurements.reverse()
-
     return [
-        measurement_to_response(measurement)
-        for measurement in measurements
+        measurement_to_response(measurement, visible)
+        for measurement, visible in reversed(db.execute(query).all())
     ]
 
 def get_latest_measurements(
@@ -210,7 +262,7 @@ def get_latest_measurements(
     )
 
     query = (
-        select(Measurement)
+        select(Measurement, measurement_location_scope(user))
         .join(
             latest_timestamp,
             (
@@ -231,9 +283,7 @@ def get_latest_measurements(
         )
     )
 
-    measurements = db.scalars(query).all()
-
     return [
-        measurement_to_response(measurement)
-        for measurement in measurements
+        measurement_to_response(measurement, visible)
+        for measurement, visible in db.execute(query)
     ]

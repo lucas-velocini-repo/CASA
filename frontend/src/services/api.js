@@ -16,6 +16,27 @@ export async function fetchStations(signal) {
   return { devices, latest };
 }
 
+export function fetchLocations(deviceId, signal) {
+  const params = new URLSearchParams({ device_id: deviceId, latest_first: "true" });
+  return fetchJson(`/measurements/locations?${params}`, signal);
+}
+
+export function saveLocationName(deviceId, locationId, name) {
+  const params = new URLSearchParams({ device_id: deviceId });
+  return apiRequest(`/measurements/locations/${locationId}/name?${params}`, {
+    method: "PUT",
+    body: { name },
+  });
+}
+
+export function updateLocationLink(deviceId, locationId, relatedId, name) {
+  const params = new URLSearchParams({ device_id: deviceId });
+  const path = `/measurements/locations/${locationId}/links/${relatedId}?${params}`;
+  return name === undefined
+    ? apiRequest(path, { method: "DELETE" })
+    : apiRequest(path, { method: "PUT", body: { name } });
+}
+
 // Existing API: latest N rows, ascending response, inclusive end, unique device+timestamp.
 // Keep the exact ISO cursor (including microseconds) and overlap/deduplicate the boundary.
 // This avoids OFFSET drift and works against the currently deployed backend.
@@ -35,6 +56,7 @@ export async function fetchHistory(
       end: cursor,
       limit: String(PAGE_SIZE),
     });
+    if (bounds.locationId) params.set("location_id", bounds.locationId);
     const page = await request(`/measurements/history?${params}`, signal);
     for (const row of page) {
       const time = Date.parse(row.timestamp);

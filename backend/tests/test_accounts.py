@@ -36,6 +36,7 @@ from app.models.accounts import (
     UserSession,
 )
 from app.models.device import Device
+from app.models.measurement_location import MeasurementLocation, MeasurementLocationGroup
 from app.services.device_auth_service import hash_api_token
 
 PASSWORD = "Uma frase de teste bem longa!"
@@ -122,7 +123,7 @@ def env():
         db.commit()
 
     def override():
-        with Session(engine) as db:
+        with Session(engine, autoflush=False) as db:
             yield db
 
     app.dependency_overrides[get_db] = override
@@ -157,6 +158,7 @@ def send(client, device=1, days=0):
         "/devices",
         "/measurements/latest",
         "/measurements/history?device_id=CASA-000001",
+        "/measurements/locations?device_id=CASA-000001",
         "/admin/users",
         "/admin/access",
         "/admin/audit",
@@ -215,6 +217,209 @@ def test_server_enforces_station_time_and_location_scope(env):
         ).status_code
         == 404
     )
+
+
+def test_measurement_locations_group_jitter_freeze_reference_and_respect_access(env):
+    client, engine = env
+    collected_at = utcnow().replace(microsecond=0) - timedelta(days=1.5)
+
+    def measure(seconds, longitude, device=1):
+        response = client.post(
+            "/measurements",
+            headers=auth(f"device-{device}"),
+            json={
+                "device_id": f"CASA-{device:06d}",
+                "timestamp": int(collected_at.timestamp()) + seconds,
+                "latitude": 0,
+                "longitude": longitude,
+                "pm": {},
+                "nc": {},
+            },
+        )
+        assert response.status_code == 201
+        return response.json()["measurement_id"]
+
+    # Roughly 1 m between samples at the equator.
+    seed = measure(-86400, 0)
+    assert measure(-86400, 0.0001) == seed
+    for seconds, longitude in enumerate([0, 0, 0.00001, 0.00002, 0.00003, 0.00004]):
+        measure(seconds, longitude)
+    second_location = measure(7, 0.001)
+    returned = measure(8, 0.00009)
+    measure(86400, 0.002)
+    measure(9, 0, device=2)
+
+    with Session(engine) as db:
+        groups = db.scalars(
+            select(MeasurementLocation)
+            .where(MeasurementLocation.device_id == 1)
+            .order_by(MeasurementLocation.id)
+        ).all()
+        assert len(groups) == 3
+        first, second, outside_access = groups
+        assert len(first.samples) == 5
+        assert first.longitude == pytest.approx(0.00002)
+        first_id, second_id, outside_id = first.id, second.id, outside_access.id
+
+    path = "/measurements/locations?device_id=CASA-000001"
+    assert client.get(path, headers=auth("bob")).status_code == 404
+    assert client.get(path, headers=auth("alice")).json() == [
+        {"location_id": first_id, "latitude": 0, "longitude": 0, "name": None, "grouped": False, "links": []},
+        {"location_id": second_id, "latitude": 0, "longitude": 0.001, "name": None, "grouped": False, "links": []},
+    ]
+    history = "/measurements/history?device_id=CASA-000001"
+    rows = client.get(f"{history}&location_id={first_id}", headers=auth("alice")).json()
+    assert len(rows) == 7
+    assert rows[-1]["measurement_id"] == returned
+    assert {row["location_id"] for row in rows} == {first_id}
+    rows = client.get(f"{history}&location_id={second_id}", headers=auth("alice")).json()
+    assert [row["measurement_id"] for row in rows] == [second_location]
+    assert client.get(f"{history}&location_id={outside_id}", headers=auth("alice")).json() == []
+
+
+def test_measurement_location_names_persist_per_account_and_respect_access(env):
+    client, _ = env
+    device_id = "CASA-000001"
+    for days, longitude in [(1.5, 0), (0, 0.001)]:
+        response = client.post("/measurements", headers=auth("device-1"), json={
+            "device_id": device_id, "timestamp": int((utcnow() - timedelta(days=days)).timestamp()),
+            "latitude": 0, "longitude": longitude, "pm": {}, "nc": {},
+        })
+        assert response.status_code == 201
+
+    locations = f"/measurements/locations?device_id={device_id}"
+    visible, hidden = client.get(locations, headers=auth()).json()
+
+    def rename(location_id, name, actor="alice", station=device_id):
+        return client.put(
+            f"/measurements/locations/{location_id}/name?device_id={station}",
+            headers=auth(actor), json={"name": name},
+        )
+
+    location_id = visible["location_id"]
+    assert rename(location_id, "Horta", "device-1").status_code == 401
+    assert rename(location_id, "Horta", "bob").status_code == 404
+    assert rename(location_id, "Horta", "admin", "CASA-000002").status_code == 404
+    assert rename(hidden["location_id"], "Horta").status_code == 404
+    assert rename(location_id, "x" * 81).status_code == 422
+    assert rename(location_id, "x\0y").status_code == 422
+
+    assert rename(location_id, "  Horta  ").json()["name"] == "Horta"
+    assert client.get(locations, headers=auth("alice")).json() == [{**visible, "name": "Horta"}]
+    assert client.get(locations, headers=auth()).json()[0]["name"] is None
+    assert rename(location_id, "Jardim", "admin").json()["name"] == "Jardim"
+    assert rename(location_id, "Horta 2").json()["name"] == "Horta 2"
+    assert rename(location_id, None).json()["name"] is None
+    assert client.get(locations, headers=auth("alice")).json() == [visible]
+    assert client.get(locations, headers=auth()).json()[0]["name"] == "Jardim"
+
+
+def test_block_radius_and_manual_location_links_are_reversible_and_personal(env):
+    client, engine = env
+    device_id = "CASA-000001"
+    timestamp = int((utcnow() - timedelta(days=1.5)).timestamp())
+    readings = []
+    for offset, longitude in enumerate([0, 0.0006, 0.002, 0.0035]):
+        result = client.post("/measurements", headers=auth("device-1"), json={
+            "device_id": device_id, "timestamp": timestamp + offset,
+            "latitude": 0, "longitude": longitude, "pm": {}, "nc": {},
+        })
+        assert result.status_code == 201
+        readings.append(result.json()["measurement_id"])
+
+    base = "/measurements/locations"
+    stations = f"?device_id={device_id}"
+    alice = auth("alice")
+    root, child, other = client.get(base + stations, headers=alice).json()
+    root_id, child_id, other_id = (item["location_id"] for item in (root, child, other))
+    history = f"/measurements/history{stations}&location_id={root_id}"
+    assert [row["measurement_id"] for row in client.get(history, headers=alice).json()] == readings[:2]
+
+    def name(location_id, label):
+        return client.put(f"{base}/{location_id}/name{stations}", headers=alice, json={"name": label})
+
+    assert name(root_id, "Principal").status_code == 200
+    assert name(child_id, "Pátio").status_code == 200
+    link = f"{base}/{root_id}/links/{child_id}{stations}"
+    assert client.put(link, headers=auth("bob"), json={"name": "Campus"}).status_code == 404
+    assert client.put(link, headers=alice, json={"name": "  "}).status_code == 422
+    assert client.put(link, headers=alice, json={"name": "Campus"}).status_code == 200
+    assert client.put(link, headers=alice, json={"name": "Campus"}).status_code == 200
+    grouped, remaining = client.get(base + stations, headers=alice).json()
+    assert remaining["location_id"] == other_id
+    assert grouped["location_id"] == root_id and grouped["name"] == "Campus"
+    assert grouped["grouped"] and [item["name"] for item in grouped["links"]] == ["Pátio"]
+    assert [row["measurement_id"] for row in client.get(history, headers=alice).json()] == readings[:3]
+    limited = client.get(history + "&limit=1", headers=alice).json()
+    assert limited[0]["measurement_id"] == readings[2]
+    assert len(client.get(base + stations, headers=auth()).json()) == 3
+    assert [row["measurement_id"] for row in client.get(history, headers=auth()).json()] == readings[:2]
+
+    assert name(root_id, "Campus novo").json()["name"] == "Campus novo"
+    assert client.delete(link, headers=auth()).status_code == 404
+    assert client.delete(link, headers=alice).json() == {"location_id": root_id}
+    restored = client.get(base + stations, headers=alice).json()
+    assert [item["name"] for item in restored] == ["Principal", "Pátio", None]
+    assert all(not item["grouped"] and not item["links"] for item in restored)
+    assert [row["measurement_id"] for row in client.get(history, headers=alice).json()] == readings[:2]
+
+    # A previous version left this group behind when its last link was removed.
+    with Session(engine) as db:
+        alice_id = db.scalar(select(User.id).where(User.name == "alice"))
+        db.add(MeasurementLocationGroup(user_id=alice_id, root_id=root_id, name="Vínculo antigo"))
+        db.commit()
+
+    reverse_link = f"{base}/{child_id}/links/{root_id}{stations}"
+    assert client.put(reverse_link, headers=alice, json={"name": "Campus de novo"}).status_code == 200
+    assert client.delete(reverse_link, headers=alice).status_code == 200
+    assert client.put(link, headers=alice, json={"name": "Campus outra vez"}).status_code == 200
+    for collected_at, coordinates in [
+        (timestamp + 4, {"latitude": 0, "longitude": 0.002}),
+        (timestamp + 5, {}),
+        (int(utcnow().timestamp()), {"latitude": 0, "longitude": 0.0035}),
+    ]:
+        assert client.post("/measurements", headers=auth("device-1"), json={
+            "device_id": device_id, "timestamp": collected_at,
+            "pm": {}, "nc": {}, **coordinates,
+        }).status_code == 201
+
+    latest_first = base + stations + "&latest_first=true"
+    assert client.get(latest_first, headers=alice).json()[0]["location_id"] == root_id
+    assert client.get(latest_first, headers=auth()).json()[0]["location_id"] == other_id
+    assert client.delete(link, headers=alice).status_code == 200
+    assert client.get(latest_first, headers=alice).json()[0]["location_id"] == child_id
+
+
+def test_measurement_location_fallback_uses_fix_at_or_before_collection(env):
+    client, engine = env
+    fixed_at = utcnow().replace(microsecond=0) - timedelta(minutes=1)
+    with Session(engine) as db:
+        device = db.get(Device, 1)
+        device.latitude, device.longitude, device.location_updated_at = 1, 2, fixed_at
+        access = db.get(DeviceAccess, 1)
+        access.data_from, access.data_until = fixed_at + timedelta(seconds=1), None
+        db.commit()
+
+    before_fix = send(client, days=1).json()["measurement_id"]
+    after_fix = send(client).json()["measurement_id"]
+    history = "/measurements/history?device_id=CASA-000001"
+    rows = client.get(history, headers=auth()).json()
+    assert rows[1]["measurement_id"] == after_fix
+    assert rows[1]["location_id"] is not None
+    assert (rows[1]["latitude"], rows[1]["longitude"]) == (1, 2)
+    unknown = client.get(f"{history}&location_id=unknown", headers=auth()).json()
+    assert [row["measurement_id"] for row in unknown] == [before_fix]
+    visible = client.get(f"{history}&location_id=unknown", headers=auth("alice")).json()
+    assert [row["measurement_id"] for row in visible] == [after_fix]
+    assert visible[0]["location_id"] is None and visible[0]["latitude"] is None
+    latest = client.get("/measurements/latest", headers=auth("alice")).json()
+    assert latest[0]["longitude"] is None and latest[0]["location_id"] is None
+    assert client.get(
+        f"{history}&location_id={rows[1]['location_id']}", headers=auth("alice")
+    ).json() == []
+    assert client.get(
+        "/measurements/locations?device_id=CASA-000001", headers=auth("alice")
+    ).json() == []
 
 
 def test_start_inclusive_end_exclusive_for_delayed_measurements(env):

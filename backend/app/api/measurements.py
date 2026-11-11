@@ -15,8 +15,13 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.schemas.measurement import (
+    LocationFilter,
     MeasurementCreate,
     MeasurementDataResponse,
+    MeasurementLocationNameUpdate,
+    MeasurementLocationLinkUpdate,
+    MeasurementLocationResponse,
+    MeasurementLocationSelection,
     MeasurementResponse,
 )
 from app.services.device_auth_service import (
@@ -26,6 +31,12 @@ from app.services.measurement_service import (
     create_measurement,
     get_latest_measurements,
     get_measurement_history,
+)
+from app.services.measurement_location_service import (
+    get_measurement_locations,
+    link_measurement_locations,
+    set_measurement_location_name,
+    unlink_measurement_location,
 )
 from app.api.dependencies import current_user
 from app.models.accounts import User
@@ -100,6 +111,7 @@ def measurement_history(
     user: User = Depends(current_user),
     start: datetime | None = None,
     end: datetime | None = None,
+    location_id: LocationFilter | None = None,
     limit: int = Query(
         default=1000,
         ge=1,
@@ -113,8 +125,53 @@ def measurement_history(
         start=start,
         end=end,
         limit=limit,
+        location_id=location_id,
         user=user,
     )
+
+
+@router.get("/locations", response_model=list[MeasurementLocationResponse])
+def measurement_locations(
+    device_id: str,
+    latest_first: bool = False,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    return get_measurement_locations(db, device_id, user=user, latest_first=latest_first)
+
+
+@router.put("/locations/{location_id}/name", response_model=MeasurementLocationResponse)
+def update_location_name(
+    location_id: int,
+    device_id: str,
+    data: MeasurementLocationNameUpdate,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    return set_measurement_location_name(db, device_id, location_id, data.name, user=user)
+
+
+@router.put("/locations/{root_id}/links/{child_id}", response_model=MeasurementLocationSelection)
+def link_locations(
+    root_id: int,
+    child_id: int,
+    device_id: str,
+    data: MeasurementLocationLinkUpdate,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    return link_measurement_locations(db, device_id, root_id, child_id, data.name, user=user)
+
+
+@router.delete("/locations/{root_id}/links/{child_id}", response_model=MeasurementLocationSelection)
+def unlink_location(
+    root_id: int,
+    child_id: int,
+    device_id: str,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    return unlink_measurement_location(db, device_id, root_id, child_id, user=user)
 
 
 @router.get(
