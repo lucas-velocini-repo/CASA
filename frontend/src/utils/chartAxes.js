@@ -44,9 +44,8 @@ export function chartTimeAxis(start, end, timeZone, maxTicks) {
     guides = surrounding.filter((tick) => tick >= domain[0] && tick <= domain[1]);
   }
   const count = Math.min(maxTicks, guides.length);
-  const stride = Math.max(1, Math.floor(guides.length / count));
-  const first = Math.floor((guides.length - 1 - (count - 1) * stride) / 2);
-  const labels = Array.from({ length: count }, (_, index) => guides[first + index * stride]);
+  const stride = (guides.length - 1) / Math.max(1, count - 1);
+  const labels = Array.from({ length: count }, (_, index) => guides[Math.round(index * stride)]);
   return { domain, guides, labels };
 }
 

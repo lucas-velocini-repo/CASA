@@ -12,7 +12,7 @@ import {
   NC_KEYS,
   PM_KEYS,
 } from "../src/utils/metrics.js";
-import { integerAxis } from "../src/utils/chartAxes.js";
+import { chartTimeAxis, integerAxis, readingHourGuides } from "../src/utils/chartAxes.js";
 import { particulateReadingMax, prepareParticulateReadings } from "../src/utils/particulateReadings.js";
 import { makeCsv } from "../src/utils/export.js";
 const period = {
@@ -22,6 +22,36 @@ const period = {
   startTime: "00:00",
   endTime: "23:59",
 };
+
+test("mobile time axes keep hourly guides while spacing labels", () => {
+  const start = Date.parse("2026-11-12T03:07Z");
+  const end = Date.parse("2026-11-13T02:53Z");
+  const { guides, labels } = chartTimeAxis(start, end, "America/Sao_Paulo", 4);
+  assert.equal(guides.length, 23);
+  assert.ok(guides.every((hour, i) => !i || hour - guides[i - 1] === 3_600_000));
+  assert.equal(labels.length, 4);
+  assert.ok(labels.every((hour) => guides.includes(hour)));
+  assert.equal(labels[0], guides[0]);
+  assert.equal(labels.at(-1), guides.at(-1));
+  const desktop = chartTimeAxis(start, end, "America/Sao_Paulo", 13);
+  assert.deepEqual(desktop.guides, guides);
+  assert.equal(desktop.labels.length, 13);
+  assert.equal(desktop.labels[0], guides[0]);
+  assert.equal(desktop.labels.at(-1), guides.at(-1));
+  assert.ok(desktop.labels.every((hour, i) => !i || hour - desktop.labels[i - 1] <= 7_200_000));
+  const stacked = readingHourGuides([{ time: start }, { time: end }], "America/Sao_Paulo", 2);
+  assert.deepEqual(stacked.guides.map(({ time }) => time), guides);
+  assert.equal(stacked.labels.length, 1);
+});
+
+test("short time axes align to round minutes in the selected time zone", () => {
+  const start = Date.parse("2026-11-12T03:07Z");
+  const end = Date.parse("2026-11-12T03:37Z");
+  const { domain, labels, guides } = chartTimeAxis(start, end, "America/Sao_Paulo", 4);
+  assert.deepEqual(domain, [Date.parse("2026-11-12T03:00Z"), Date.parse("2026-11-12T03:40Z")]);
+  assert.equal(labels.length, 4);
+  assert.ok(guides.every((time) => new Date(time).getUTCMinutes() % 10 === 0));
+});
 
 test("full days use selected timezone and exclusive midnight, independent of host", () => {
   const br = periodBounds(period);
