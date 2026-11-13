@@ -197,6 +197,8 @@ small,
   align-items: start;
 }
 .sidebar {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   position: sticky;
   top: 24px;
@@ -296,9 +298,6 @@ small,
   letter-spacing: 1.7px;
   font-weight: 650;
 }
-.mobile-stations {
-  display: none;
-}
 .content-area {
   min-width: 0;
   background: white;
@@ -326,6 +325,17 @@ small,
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
+}
+.station-map-button {
+  order: 1;
+  width: 100%;
+  margin: 8px 0;
+  color: var(--green-dark);
+}
+.sidebar .station-list,
+.sidebar > .muted,
+.sidebar-footer {
+  order: 2;
 }
 .maps-link {
   display: inline-flex;
@@ -930,24 +940,32 @@ tbody tr:nth-child(even) {
     gap: 12px;
   }
   .sidebar {
-    display: none;
-  }
-  .mobile-stations {
-    display: flex;
-    align-items: center;
-    gap: 12px;
+    display: grid;
+    position: static;
     width: 100%;
-    padding: 4px 0;
   }
-  .mobile-stations label {
-    font-size: 12px;
-    font-weight: 600;
+  .sidebar-heading {
+    padding-bottom: 8px;
   }
-  .mobile-stations select {
-    flex: 1;
-    width: 100%;
-    font-size: 13px;
+  .sidebar .station-list {
+    grid-auto-flow: column;
+    grid-auto-columns: min(78%, 240px);
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scroll-snap-type: x proximity;
+    scroll-padding-inline: 4px;
+    margin-top: 8px;
+    padding: 4px 4px 8px;
+  }
+  .sidebar .station-card {
+    scroll-snap-align: start;
+  }
+  .sidebar .station-map-button {
+    order: 3;
     min-height: 44px;
+  }
+  .sidebar-footer {
+    display: none;
   }
   .content-area {
     width: 100%;
@@ -1357,6 +1375,11 @@ tbody tr:nth-child(even) {
   position: absolute;
   inset-inline: 0;
   border-top: 1px dashed #e0ebe8;
+}
+.pm-day-time-guide {
+  position: absolute;
+  inset-block: 0;
+  border-left: 1px dashed #e0ebe8;
 }
 .pm-day-column {
   position: absolute;

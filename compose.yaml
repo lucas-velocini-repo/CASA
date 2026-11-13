@@ -84,6 +84,8 @@ services:
   frontend:
     build:
       context: ./frontend
+      args:
+        VITE_MAPTILER_KEY: ${VITE_MAPTILER_KEY:-}
 
     container_name: casa-frontend
 

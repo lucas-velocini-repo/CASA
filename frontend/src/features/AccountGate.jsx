@@ -29,28 +29,45 @@ function login(credentials, mfaCode = "") {
 }
 
 function LoginPassword() {
-  const [visible, setVisible] = useState(false);
+  const input = useRef(null);
+  const [preview, setPreview] = useState(null);
+  const visible = preview !== null;
   const Icon = visible ? EyeOff : Eye;
   const action = visible ? "Ocultar senha" : "Mostrar senha";
   return (
     <div className="account-password">
-      <label htmlFor="login-password">Senha</label>
-      <input
-        id="login-password"
-        name="password"
-        type={visible ? "text" : "password"}
-        autoComplete="current-password"
-        maxLength={128}
-        required
-      />
-      <button
-        type="button"
-        aria-label={action}
-        aria-controls="login-password"
-        onClick={() => setVisible((value) => !value)}
-      >
-        <Icon size={19} aria-hidden="true" />
-      </button>
+      <label htmlFor="current-password">Senha</label>
+      <div className="account-password-control">
+        <input
+          ref={input}
+          id="current-password"
+          name="current-password"
+          type="password"
+          autoComplete="current-password"
+          autoCorrect="off"
+          autoCapitalize="none"
+          spellCheck={false}
+          maxLength={128}
+          required
+          onInput={(event) => {
+            if (visible) setPreview(event.currentTarget.value);
+          }}
+        />
+        <button
+          type="button"
+          aria-label={action}
+          aria-expanded={visible}
+          aria-controls={visible ? "password-preview" : undefined}
+          onClick={() => setPreview(visible ? null : input.current.value)}
+        >
+          <Icon size={19} aria-hidden="true" />
+        </button>
+      </div>
+      {visible && (
+        <div className="account-password-preview" id="password-preview">
+          {preview || "Nenhuma senha digitada."}
+        </div>
+      )}
     </div>
   );
 }
@@ -218,7 +235,7 @@ export default function AccountGate({ children }) {
     const form = new FormData(event.currentTarget);
     try {
       if (mode === "login") {
-        const credentials = { email: form.get("email"), password: form.get("password") };
+        const credentials = { email: form.get("email"), password: form.get("current-password") };
         try {
           setSession(await login(credentials));
         } catch (e) {

@@ -11,6 +11,7 @@ from app.models.sensor_value import SensorValue
 from app.models.accounts import Provisioning
 from app.services.access_service import measurement_location_scope, measurement_scope, require_device
 from app.services.measurement_location_service import location_ids_for_filter
+from app.services.installation_service import apply_installation_location, installation_at, latest_installation
 from app.services.location_grouping import (
     LOCATION_RADIUS_METERS,
     add_reference_sample,
@@ -30,12 +31,17 @@ from app.schemas.measurement import (
 )
 
 def assign_measurement_location(db: Session, measurement: Measurement, device: Device):
+    installation = installation_at(db, device.id, measurement.timestamp)
+    if installation is not None:
+        apply_installation_location(db, installation, measurement)
+        return
     latitude, longitude = measurement.latitude, measurement.longitude
     fallback_at = None
     if (
         latitude is None
         and longitude is None
         and device.location_updated_at is not None
+        and latest_installation(db, device.id) is None
         and aware(device.location_updated_at) <= measurement.timestamp
     ):
         latitude, longitude = device.latitude, device.longitude
@@ -45,7 +51,8 @@ def assign_measurement_location(db: Session, measurement: Measurement, device: D
 
     locations = db.scalars(
         select(MeasurementLocation).where(
-            MeasurementLocation.device_id == device.id, MeasurementLocation.area_id.is_(None)
+            MeasurementLocation.device_id == device.id, MeasurementLocation.area_id.is_(None),
+            MeasurementLocation.installation_id.is_(None),
         )
     )
     location = closest_location(locations, latitude, longitude, LOCATION_RADIUS_METERS)
@@ -123,7 +130,9 @@ def create_measurement(
 
     try:
         assign_measurement_location(db, measurement, device)
-        device.last_seen = datetime.now(timezone.utc)
+        current_installation = latest_installation(db, device.id)
+        if current_installation is None or timestamp >= aware(current_installation.started_at):
+            device.last_seen = datetime.now(timezone.utc)
         db.add(measurement)
         pending = db.scalar(select(Provisioning).where(Provisioning.device_id == device.id))
         if pending and not pending.confirmed_at:

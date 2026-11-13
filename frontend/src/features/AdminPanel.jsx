@@ -33,6 +33,7 @@ export default function AdminPanel({ currentUser, devices, onChange }) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [transfer, setTransfer] = useState(false);
   const loader = useCallback(async (signal) => {
     const [users, access, audit, mail, configurations] = await Promise.all(
       ["users", "access", "audit", "mail-status", "device-configurations"].map((path) =>
@@ -240,8 +241,8 @@ export default function AdminPanel({ currentUser, devices, onChange }) {
         <h2>Vincular uma estação</h2>
         <p>
           O início é inclusivo e o fim é exclusivo. Os horários abaixo seguem o
-          fuso deste dispositivo. Ao salvar um novo período para a mesma pessoa
-          e estação, o vínculo anterior é substituído.
+          fuso deste dispositivo. Uma transferência começa no momento em que é salva
+          e encerra os acessos da instalação anterior.
         </p>
         <form
           className="admin-form"
@@ -255,10 +256,12 @@ export default function AdminPanel({ currentUser, devices, onChange }) {
                   body: {
                     user_id: Number(values.get("user_id")),
                     device_id: Number(values.get("device_id")),
-                    data_from: new Date(values.get("data_from")).toISOString(),
+                    data_from: transfer ? new Date().toISOString() : new Date(values.get("data_from")).toISOString(),
                     data_until: values.get("data_until")
                       ? new Date(values.get("data_until")).toISOString()
                       : null,
+                    new_installation: values.has("new_installation"),
+                    backfill_initial: values.has("backfill_initial"),
                   },
                 }),
               "Acesso atualizado.",
@@ -295,12 +298,27 @@ export default function AdminPanel({ currentUser, devices, onChange }) {
           </label>
           <label>
             Dados a partir de
-            <input name="data_from" type="datetime-local" required />
+            {transfer
+              ? <input value="No momento em que salvar" readOnly />
+              : <input name="data_from" type="datetime-local" required />}
           </label>
           <label>
             Dados até (opcional)
             <input name="data_until" type="datetime-local" />
           </label>
+          <div className="access-location-options">
+            <label>
+              <input name="new_installation" type="checkbox" checked={transfer}
+                onChange={(event) => setTransfer(event.target.checked)} />
+              <span>Transferir agora e reiniciar a localização</span>
+            </label>
+            <label>
+              <input key={String(transfer)} name="backfill_initial" type="checkbox" disabled={!transfer}
+                aria-describedby="backfill-help" />
+              <span>Confirmo que as primeiras leituras serão feitas no destino</span>
+            </label>
+            <small id="backfill-help">Associa as leituras iniciais ao primeiro GPS válido, se a posição for obtida em até 24 horas após a transferência.</small>
+          </div>
           <button disabled={busy}>Salvar vínculo</button>
         </form>
         <div className="admin-table-scroll">
@@ -314,7 +332,7 @@ export default function AdminPanel({ currentUser, devices, onChange }) {
               </tr>
             </thead>
             <tbody>
-              {currentAccess.map((a) => (
+              {[...currentAccess, ...(state.data?.access.filter((a) => a.retain_history && a.revoked_at) || [])].map((a) => (
                 <tr key={a.id}>
                   <td>{users.find((u) => u.id === a.user_id)?.name}</td>
                   <td>{devices.find((d) => d.id === a.device_id)?.name}</td>
@@ -323,8 +341,15 @@ export default function AdminPanel({ currentUser, devices, onChange }) {
                     {a.data_until
                       ? new Date(a.data_until).toLocaleString("pt-BR")
                       : "sem data final"}
+                    {a.retain_history && " (período anterior)"}
                   </td>
                   <td>
+                    {!a.revoked_at && (
+                      <button disabled={busy} onClick={() => run(
+                        () => apiRequest(`/admin/access/${a.id}?keep_history=true`, { method: "DELETE" }),
+                        "Acesso encerrado. Período preservado para um retorno.",
+                      )}>Encerrar acesso</button>
+                    )}
                     <button
                       disabled={busy}
                       onClick={() => {
@@ -338,7 +363,7 @@ export default function AdminPanel({ currentUser, devices, onChange }) {
                           );
                       }}
                     >
-                      Revogar
+                      Revogar definitivamente
                     </button>
                   </td>
                 </tr>

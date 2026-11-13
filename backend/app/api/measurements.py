@@ -23,6 +23,7 @@ from app.schemas.measurement import (
     MeasurementLocationResponse,
     MeasurementLocationSelection,
     MeasurementResponse,
+    StationMapPin,
 )
 from app.services.device_auth_service import (
     authenticate_device,
@@ -40,6 +41,7 @@ from app.services.measurement_location_service import (
 )
 from app.api.dependencies import current_user
 from app.models.accounts import User
+from app.services.station_map_service import station_map
 
 router = APIRouter(
     prefix="/measurements",
@@ -172,6 +174,11 @@ def unlink_location(
     db: Session = Depends(get_db),
 ):
     return unlink_measurement_location(db, device_id, root_id, child_id, user=user)
+
+
+@router.get("/station-map", response_model=list[StationMapPin])
+def station_map_data(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    return station_map(db, user)
 
 
 @router.get(

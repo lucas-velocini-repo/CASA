@@ -2,7 +2,7 @@ import MapsLink from "./MapsLink";
 import StationStatus from "./StationStatus";
 import { formatTimestamp } from "../utils/dates";
 
-export default function StationHeader({ device, latest, timeZone }) {
+export default function StationHeader({ device, timeZone }) {
   const hasLocation =
     Number.isFinite(device.latitude) && Number.isFinite(device.longitude);
 
@@ -15,7 +15,7 @@ export default function StationHeader({ device, latest, timeZone }) {
           <span>
             {hasLocation
               ? `Localização: ${device.latitude.toFixed(4)}, ${device.longitude.toFixed(4)}`
-              : "Localização indisponível"}
+              : device.location_pending ? "Local desconhecido · aguardando GPS" : "Localização indisponível"}
           </span>
           {hasLocation && (
             <MapsLink latitude={device.latitude} longitude={device.longitude} />
@@ -23,7 +23,7 @@ export default function StationHeader({ device, latest, timeZone }) {
         </p>
       </div>
       <div className="station-meta">
-        <StationStatus lastSeen={device.last_seen || latest?.received_at} intervalSeconds={device.measurement_interval_seconds} />
+        <StationStatus lastSeen={device.last_seen} intervalSeconds={device.measurement_interval_seconds} />
         <small>
           Última comunicação:{" "}
           {formatTimestamp(device.last_seen, false, timeZone)}

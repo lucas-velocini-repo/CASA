@@ -18,7 +18,7 @@ import {
   PM_KEYS,
   NC_KEYS,
 } from "../utils/metrics";
-import { integerAxis } from "../utils/chartAxes";
+import { chartTimeAxis, integerAxis } from "../utils/chartAxes";
 import { formatTimestamp } from "../utils/dates";
 import { exportChart } from "../utils/export";
 
@@ -37,6 +37,7 @@ export default function MeasurementChart({
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState("");
   const [zero, setZero] = useState(false);
+  const [chartWidth, setChartWidth] = useState(0);
   const data = useMemo(() => chartRows(rows, keys), [rows, keys]);
   const domain = useMemo(() => automaticDomain(rows, keys), [rows, keys]);
   const valueAxis = integerAxis(
@@ -46,6 +47,21 @@ export default function MeasurementChart({
     keys.some((key) => Number.isFinite(row.values?.[key])),
   );
   const reduced = data.length < rows.length;
+  const timeAxis = useMemo(() => {
+    if (!data.length) return null;
+    const start = data[0].time;
+    const end = data.at(-1).time;
+    const clock = new Intl.DateTimeFormat("pt-BR", { timeZone, dateStyle: "short" });
+    const multiDay = clock.format(start) !== clock.format(end);
+    const availableWidth = chartWidth - 65 - 16;
+    const maxLabels = Math.max(4, Math.floor(availableWidth / (multiDay ? 78 : 54)));
+    const axis = chartTimeAxis(start, end, timeZone, maxLabels);
+    const labels = new Intl.DateTimeFormat("pt-BR", {
+      timeZone, hourCycle: "h23", hour: "2-digit", minute: "2-digit",
+      ...(multiDay ? { day: "2-digit", month: "2-digit" } : {}),
+    });
+    return { ...axis, format: labels.format };
+  }, [data, chartWidth, timeZone]);
   const particulate = keys === PM_KEYS || keys === NC_KEYS;
   async function save() {
     setExporting(true);
@@ -97,7 +113,7 @@ export default function MeasurementChart({
             role="img"
             aria-label={`${title}: ${rows.length} registros, ${period}. Valores disponíveis na aba Dados históricos.`}
           >
-            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} onResize={setChartWidth}>
               <LineChart
                 data={data}
                 margin={{ top: 14, right: 16, left: 0, bottom: 4 }}
@@ -105,19 +121,25 @@ export default function MeasurementChart({
               >
                 <CartesianGrid
                   stroke="#e4eeec"
-                  vertical={false}
+                  verticalCoordinatesGenerator={({ offset }) => {
+                    const [start, end] = timeAxis.domain;
+                    return timeAxis.guides.map((time) =>
+                      offset.left + (time - start) / (end - start) * offset.width,
+                    );
+                  }}
+                  syncWithTicks
                   strokeDasharray="3 4"
                 />
                 <XAxis
                   dataKey="time"
                   type="number"
                   scale="time"
-                  domain={["dataMin", "dataMax"]}
-                  tickFormatter={(value) =>
-                    formatTimestamp(value, true, timeZone)
-                  }
-                  minTickGap={44}
-                  tick={{ fill: "#637c82", fontSize: 11 }}
+                  domain={timeAxis.domain}
+                  allowDataOverflow
+                  ticks={timeAxis.labels}
+                  tickFormatter={timeAxis.format}
+                  interval={0}
+                  tick={{ fill: "#637c82", fontSize: chartWidth < 380 ? 9 : 11 }}
                   axisLine={false}
                   tickLine={false}
                 />

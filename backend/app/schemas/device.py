@@ -23,9 +23,9 @@ class DeviceLocationUpdate(BaseModel):
 
 class DeviceLocationResponse(BaseModel):
     device_id: str
-    latitude: float
-    longitude: float
-    location_updated_at: datetime
+    latitude: float | None
+    longitude: float | None
+    location_updated_at: datetime | None
     status: str
 
 
@@ -56,6 +56,7 @@ class DeviceResponse(BaseModel):
     latitude: float | None = None
     longitude: float | None = None
     location_updated_at: datetime | None = None
+    location_pending: bool = False
 
     firmware_version: str | None
     measurement_interval_seconds: int | None = None

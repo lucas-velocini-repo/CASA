@@ -36,6 +36,7 @@ from app.models.accounts import (
     UserSession,
 )
 from app.models.device import Device
+from app.models.measurement import Measurement
 from app.models.measurement_location import MeasurementLocation, MeasurementLocationGroup
 from app.services.device_auth_service import hash_api_token
 
@@ -137,6 +138,14 @@ def env():
 
 def auth(name="admin"):
     return {"Authorization": f"Bearer {name}"}
+
+
+def confirm_fixture_coordinates(engine):
+    # Simulate acquisition evidence for the historical coordinates used by these tests.
+    with Session(engine) as db:
+        for measurement in db.scalars(select(Measurement).where(Measurement.location_id.is_not(None))):
+            measurement.location_fallback_at = measurement.timestamp
+        db.commit()
 
 
 def send(client, device=1, days=0):
@@ -263,6 +272,8 @@ def test_measurement_locations_group_jitter_freeze_reference_and_respect_access(
 
     path = "/measurements/locations?device_id=CASA-000001"
     assert client.get(path, headers=auth("bob")).status_code == 404
+    assert client.get(path, headers=auth("alice")).json() == []
+    confirm_fixture_coordinates(engine)
     assert client.get(path, headers=auth("alice")).json() == [
         {"location_id": first_id, "latitude": 0, "longitude": 0, "name": None, "grouped": False, "links": []},
         {"location_id": second_id, "latitude": 0, "longitude": 0.001, "name": None, "grouped": False, "links": []},
@@ -278,7 +289,7 @@ def test_measurement_locations_group_jitter_freeze_reference_and_respect_access(
 
 
 def test_measurement_location_names_persist_per_account_and_respect_access(env):
-    client, _ = env
+    client, engine = env
     device_id = "CASA-000001"
     for days, longitude in [(1.5, 0), (0, 0.001)]:
         response = client.post("/measurements", headers=auth("device-1"), json={
@@ -287,6 +298,7 @@ def test_measurement_location_names_persist_per_account_and_respect_access(env):
         })
         assert response.status_code == 201
 
+    confirm_fixture_coordinates(engine)
     locations = f"/measurements/locations?device_id={device_id}"
     visible, hidden = client.get(locations, headers=auth()).json()
 
@@ -330,6 +342,7 @@ def test_block_radius_and_manual_location_links_are_reversible_and_personal(env)
     base = "/measurements/locations"
     stations = f"?device_id={device_id}"
     alice = auth("alice")
+    confirm_fixture_coordinates(engine)
     root, child, other = client.get(base + stations, headers=alice).json()
     root_id, child_id, other_id = (item["location_id"] for item in (root, child, other))
     history = f"/measurements/history{stations}&location_id={root_id}"
@@ -384,10 +397,66 @@ def test_block_radius_and_manual_location_links_are_reversible_and_personal(env)
         }).status_code == 201
 
     latest_first = base + stations + "&latest_first=true"
+    confirm_fixture_coordinates(engine)
     assert client.get(latest_first, headers=alice).json()[0]["location_id"] == root_id
     assert client.get(latest_first, headers=auth()).json()[0]["location_id"] == other_id
     assert client.delete(link, headers=alice).status_code == 200
     assert client.get(latest_first, headers=alice).json()[0]["location_id"] == child_id
+
+
+def test_transfer_keeps_other_house_private_and_restores_prior_window(env, monkeypatch):
+    from app.api import admin as admin_api
+
+    client, engine = env
+    start = utcnow().replace(microsecond=0) - timedelta(minutes=30)
+    station = "CASA-000001"
+    with Session(engine) as db:
+        users = dict(db.execute(select(User.name, User.id)).all())
+        db.commit()
+
+    def transfer(name, when):
+        monkeypatch.setattr(admin_api, "utcnow", lambda: when)
+        response = client.post("/admin/access", headers=auth(), json={
+            "user_id": users[name], "device_id": 1, "data_from": when.isoformat(),
+            "new_installation": True, "backfill_initial": True,
+        })
+        assert response.status_code == 201
+
+    def read(when):
+        response = client.post("/measurements", headers=auth("device-1"), json={
+            "device_id": station, "timestamp": int(when.timestamp()),
+            "latitude": 50, "longitude": 50, "pm": {}, "nc": {},
+        })
+        assert response.status_code == 201
+
+    def fix(when, latitude):
+        response = client.patch("/devices/location", headers=auth("device-1"), json={
+            "acquired_at": when.isoformat(), "latitude": latitude, "longitude": 0,
+        })
+        assert response.status_code == 200
+
+    def history(name):
+        return client.get(f"/measurements/history?device_id={station}", headers=auth(name)).json()
+
+    transfer("alice", start)
+    read(start + timedelta(seconds=1))
+    assert history("alice")[0]["latitude"] is None
+    fix(start + timedelta(seconds=3), 10)
+    assert history("alice")[0]["latitude"] == 10
+    transfer("bob", start + timedelta(minutes=10))
+    fix(start + timedelta(seconds=4), 10)
+    read(start + timedelta(minutes=11))
+    assert history("bob")[0]["latitude"] is None
+    fix(start + timedelta(minutes=12), 20)
+    assert history("bob")[0]["latitude"] == 20
+    transfer("alice", start + timedelta(minutes=20))
+    read(start + timedelta(minutes=21))
+    assert [row["latitude"] for row in history("alice")] == [10, None]
+    fix(start + timedelta(minutes=22), 10)
+    response = client.get("/measurements/station-map", headers=auth("alice"))
+    assert response.status_code == 200
+    assert {pin["latitude"] for pin in response.json()} == {10}
+    assert client.get("/measurements/station-map", headers=auth("bob")).json() == []
 
 
 def test_measurement_location_fallback_uses_fix_at_or_before_collection(env):

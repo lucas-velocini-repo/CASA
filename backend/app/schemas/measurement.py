@@ -107,3 +107,21 @@ class MeasurementLocationLinkUpdate(BaseModel):
 
 class MeasurementLocationSelection(BaseModel):
     location_id: int
+
+
+class StationMapVisit(BaseModel):
+    start: datetime
+    end: datetime
+
+
+class StationMapPin(BaseModel):
+    area_id: int
+    location_id: int
+    device_id: str
+    device_name: str
+    name: str | None
+    latitude: float
+    longitude: float
+    status: Literal["active", "inactive", "old"]
+    last_measurement: datetime
+    visits: list[StationMapVisit]

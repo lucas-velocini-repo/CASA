@@ -14,6 +14,10 @@ class MeasurementLocation(Base):
     latitude: Mapped[float] = mapped_column(Float)
     longitude: Mapped[float] = mapped_column(Float)
     samples: Mapped[list[list[float]]] = mapped_column(JSON)
+    installation_id: Mapped[int | None] = mapped_column(
+        ForeignKey("station_installations.id", name="fk_measurement_locations_installation", ondelete="CASCADE"),
+        index=True,
+    )
     area_id: Mapped[int | None] = mapped_column(
         ForeignKey("measurement_locations.id", name="fk_measurement_locations_area_id", ondelete="SET NULL"),
         index=True,

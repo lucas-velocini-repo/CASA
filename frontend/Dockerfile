@@ -8,6 +8,7 @@ RUN npm ci
 
 COPY . .
 
+ARG VITE_MAPTILER_KEY
 RUN npm run build
 
 

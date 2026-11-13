@@ -4,7 +4,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import admin_user
-from app.core.security import utcnow
+from app.core.security import aware, utcnow
 from app.db.database import get_db
 from app.models.accounts import (
     AccountToken,
@@ -15,6 +15,8 @@ from app.models.accounts import (
     User,
 )
 from app.models.device import Device
+from app.models.station_installation import StationInstallation
+from app.services.installation_service import latest_installation, lock_station
 from app.schemas.accounts import AccessRequest, DeviceUpdate, InviteRequest, UserUpdate
 from app.schemas.device import DeviceResponse
 from app.services.account_service import (
@@ -139,6 +141,7 @@ def accesses(db: Session = Depends(get_db)):
             "granted_by": a.granted_by,
             "granted_at": a.granted_at,
             "revoked_at": a.revoked_at,
+            "retain_history": a.retain_history,
         }
         for a in db.scalars(select(DeviceAccess).order_by(DeviceAccess.id.desc()))
     ]
@@ -151,7 +154,8 @@ def grant(
     db: Session = Depends(get_db),
 ):
     user = db.scalar(select(User).where(User.id == data.user_id).with_for_update())
-    if not user or not db.get(Device, data.device_id):
+    device = lock_station(db, data.device_id)
+    if not user or not device:
         raise HTTPException(404, "Conta ou estação não encontrada.")
     previous = db.scalar(
         select(DeviceAccess).where(
@@ -160,10 +164,34 @@ def grant(
             DeviceAccess.revoked_at.is_(None),
         )
     )
-    if previous:
-        previous.revoked_at = utcnow()
+    start = data.data_from
+    if data.new_installation:
+        start = utcnow()
+        if data.data_until and data.data_until <= start:
+            raise HTTPException(422, "O fim do acesso deve ser posterior à transferência.")
+        current_access = db.scalars(select(DeviceAccess).where(
+            DeviceAccess.device_id == device.id, DeviceAccess.revoked_at.is_(None),
+        ).with_for_update()).all()
+        for item in current_access:
+            end = min(aware(item.data_until), start) if item.data_until else start
+            item.retain_history = end > aware(item.data_from)
+            if item.retain_history:
+                item.data_until = end
+            item.revoked_at = start
+        db.add(StationInstallation(device_id=device.id, started_at=start, backfill_initial=data.backfill_initial))
+        device.latitude = device.longitude = device.location_updated_at = device.last_seen = None
         db.flush()
-    access = DeviceAccess(**data.model_dump(), granted_by=actor.id)
+    else:
+        installation = latest_installation(db, device.id)
+        if installation and start < aware(installation.started_at):
+            raise HTTPException(422, "O acesso deve começar na instalação atual. Use uma transferência para reiniciar a localização.")
+        if previous:
+            previous.revoked_at = utcnow()
+            db.flush()
+    access = DeviceAccess(
+        user_id=data.user_id, device_id=data.device_id, data_from=start,
+        data_until=data.data_until, granted_by=actor.id,
+    )
     db.add(access)
     db.flush()
     audit(
@@ -173,8 +201,10 @@ def grant(
         access.id,
         user_id=user.id,
         device_id=data.device_id,
-        data_from=data.data_from.isoformat(),
+        data_from=start.isoformat(),
         data_until=data.data_until.isoformat() if data.data_until else None,
+        new_installation=data.new_installation,
+        backfill_initial=data.backfill_initial,
     )
     db.commit()
     return {"id": access.id}
@@ -182,15 +212,25 @@ def grant(
 
 @router.delete("/access/{access_id}")
 def revoke(
-    access_id: int, actor: User = Depends(admin_user), db: Session = Depends(get_db)
+    access_id: int, keep_history: bool = False,
+    actor: User = Depends(admin_user), db: Session = Depends(get_db)
 ):
     access = db.scalar(
         select(DeviceAccess).where(DeviceAccess.id == access_id).with_for_update()
     )
     if not access:
         raise HTTPException(404, "Vínculo não encontrado.")
-    access.revoked_at = utcnow()
-    audit(db, actor, "station.access.revoked", access.id)
+    if keep_history and access.revoked_at is None:
+        ended = utcnow()
+        end = min(aware(access.data_until), ended) if access.data_until else ended
+        access.retain_history = end > aware(access.data_from)
+        if access.retain_history:
+            access.data_until = end
+        access.revoked_at = ended
+    elif not keep_history:
+        access.revoked_at = access.revoked_at or utcnow()
+        access.retain_history = False
+    audit(db, actor, "station.access.revoked", access.id, retain_history=access.retain_history)
     db.commit()
     return {"message": "Acesso revogado."}
 

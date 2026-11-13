@@ -1,6 +1,6 @@
 import { useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ChevronFirst, ChevronLast, Download } from "lucide-react";
-import { integerAxis } from "../utils/chartAxes";
+import { integerAxis, readingHourGuides } from "../utils/chartAxes";
 import { formatTimestamp } from "../utils/dates";
 import { exportParticulateChart } from "../utils/export";
 import { formatParticulateValue, formatValue, metrics, NC_KEYS, PM_KEYS } from "../utils/metrics";
@@ -56,6 +56,10 @@ function ScrollableReadings({
       minute: "2-digit",
     }),
     [timeZone, multipleDates],
+  );
+  const { guides, labels } = useMemo(
+    () => readingHourGuides(readings, timeZone, multipleDates ? 3 : 2),
+    [readings, timeZone, multipleDates],
   );
 
   const updateViewport = useCallback((element, scrolling = false) => {
@@ -172,11 +176,21 @@ function ScrollableReadings({
             </div>
             <div className="pm-day-grid" aria-hidden="true">
               {axis.ticks.map((tick) => <i key={tick} style={{ bottom: `${tick / top * 100}%` }} />)}
+              {guides.map(({ time, column }) => {
+                const left = column * COLUMN_WIDTH;
+                const center = left - viewport.left;
+                if (center < 0 || center > plotWidth) return null;
+                return <div className="pm-day-time-guide" key={time} style={{ left }} />;
+              })}
+              {labels.map(({ time, column }) => {
+                const left = column * COLUMN_WIDTH;
+                const center = left - viewport.left;
+                if (center < labelMargin || center > plotWidth - labelMargin) return null;
+                return <span className="pm-day-hour" key={time} style={{ left }}>{tickTime.format(time)}</span>;
+              })}
             </div>
             {rendered.map((reading, offset) => {
               const index = firstRendered + offset;
-              const center = (index + 0.5) * COLUMN_WIDTH - viewport.left;
-              const showHour = index % 3 === 0 && center >= labelMargin && center <= plotWidth - labelMargin;
               return (
                 <button
                   type="button"
@@ -199,7 +213,6 @@ function ScrollableReadings({
                       <i key={key} style={{ height: `${difference / top * 100}%`, background: metrics[key].color }} />
                     ))}
                   </span>
-                  {showHour && <span className="pm-day-hour" aria-hidden="true">{tickTime.format(reading.time)}</span>}
                 </button>
               );
             })}

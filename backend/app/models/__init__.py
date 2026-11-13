@@ -9,3 +9,4 @@ __all__ = ["StationConfiguration", "Device", "Measurement", "MeasurementLocation
     "DeviceAccess", "MailJob", "Provisioning", "RateBucket", "User", "UserSession"]
 
 from app.models.station_configuration import StationConfiguration
+from app.models.station_installation import StationFix, StationInstallation

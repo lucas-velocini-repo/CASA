@@ -3,11 +3,25 @@ from sqlalchemy.orm import Session
 
 from app.models.device import Device
 from app.schemas.device import DeviceLocationResponse, DeviceLocationUpdate
+from app.services.installation_service import installation_at, latest_installation, lock_station, store_fix
 
 
 def update_device_location(
     db: Session, device: Device, data: DeviceLocationUpdate
 ) -> DeviceLocationResponse:
+    device = lock_station(db, device.id)
+    if latest_installation(db, device.id):
+        installation = installation_at(db, device.id, data.acquired_at)
+        changed = installation is not None and store_fix(db, device, installation, data)
+        if changed:
+            device.latitude = data.latitude
+            device.longitude = data.longitude
+            device.location_updated_at = data.acquired_at
+        db.commit()
+        return DeviceLocationResponse(
+            device_id=device.device_id, latitude=device.latitude, longitude=device.longitude,
+            location_updated_at=device.location_updated_at, status="stored" if changed else "unchanged",
+        )
     # Keep the timestamp comparison in the UPDATE so concurrent requests and
     # delayed offline retries cannot overwrite a newer fix. Equal times are
     # idempotent, including retries after a lost HTTP response.

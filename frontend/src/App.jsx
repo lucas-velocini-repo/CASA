@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { lazy, Suspense, useCallback, useState } from "react";
 import { Download, RefreshCw, Settings, LogOut, ShieldCheck, LayoutDashboard } from "lucide-react";
 import AdminPanel from "./features/AdminPanel";
 import SettingsDialog from "./components/SettingsDialog";
@@ -20,12 +20,15 @@ import {
   initialPeriod,
   periodBounds,
   periodLabel,
+  today,
 } from "./utils/dates";
 import { exportCsv } from "./utils/export";
 import "./styles/dashboard.css";
 
-function StationData({ device, latest, timeZone }) {
-  const [period, setPeriod] = useState(() => initialPeriod(timeZone));
+const StationMap = lazy(() => import("./features/StationMap"));
+
+function StationData({ device, timeZone, mapSelection }) {
+  const [period, setPeriod] = useState(() => mapSelection?.period || initialPeriod(timeZone));
   const [tab, setTab] = useState("overview");
   const [revision, setRevision] = useState(0);
   const [locationRevision, setLocationRevision] = useState(0);
@@ -36,8 +39,10 @@ function StationData({ device, latest, timeZone }) {
     `locations:${deviceId}`, loadLocations, 60_000, `${revision}:${locationRevision}`,
   );
   const latestLocationId = locations.data?.[0]?.location_id;
-  const defaultLocationId = locations.status === "loading" ? null : String(latestLocationId ?? "");
-  const locationId = locationsByStation[deviceId] ?? defaultLocationId;
+  const defaultLocationId = device.location_pending ? "unknown" : locations.status === "loading" ? null : String(latestLocationId ?? "");
+  const locationId = locationsByStation[deviceId] ?? (
+    mapSelection?.deviceId === deviceId ? mapSelection.locationId : defaultLocationId
+  );
   const { start, end } = periodBounds(period, timeZone);
   const load = useCallback(
     (signal) => fetchHistory(deviceId, { start, end, locationId }, signal),
@@ -51,7 +56,7 @@ function StationData({ device, latest, timeZone }) {
   const name = device.name || device.device_id;
   return (
     <main className="content-area">
-      <StationHeader device={device} latest={latest} timeZone={timeZone} />
+      <StationHeader device={device} timeZone={timeZone} />
       <nav className="tabs" aria-label="Visualização dos dados">
         {tabs.map((item) => (
           <button
@@ -160,6 +165,8 @@ export default function App({ user, onLogout }) {
   const [adminOpen, setAdminOpen] = useState(false);
   const [timeZone, setTimeZone] = useState(readTimeZone);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [mapOpen, setMapOpen] = useState(false);
+  const [mapSelection, setMapSelection] = useState(null);
   function saveTimeZone(value) {
     setTimeZone(value);
     try {
@@ -184,14 +191,28 @@ export default function App({ user, onLogout }) {
       /* Session preference still works. */
     }
   }
+  function openVisit(pin, visit) {
+    selectStation(pin.device_id);
+    const day = (stamp) => today(new Date(stamp), timeZone);
+    const hour = (stamp) => new Intl.DateTimeFormat("pt-BR", {
+      timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+    }).format(new Date(stamp));
+    setMapSelection((previous) => ({
+      key: (previous?.key || 0) + 1,
+      deviceId: pin.device_id,
+      locationId: String(pin.location_id),
+      period: {
+        startDate: day(visit.start), endDate: day(visit.end),
+        startTime: hour(visit.start), endTime: hour(visit.end), useTime: true,
+      },
+    }));
+    setMapOpen(false);
+  }
   const [revision, setRevision] = useState(0);
   const stations = usePolling(`stations:${revision}`, fetchStations, 30_000);
   const devices = stations.data?.devices || [];
   const selected =
     devices.find((device) => device.device_id === selectedId) || devices[0];
-  const latest = stations.data?.latest.find(
-    (row) => row.device_id === selected?.device_id,
-  );
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -245,12 +266,13 @@ export default function App({ user, onLogout }) {
               devices={devices}
               selectedId={selected.device_id}
               onSelect={selectStation}
+              onOpenMap={() => setMapOpen(true)}
             />
             <StationData
-              key={timeZone}
+              key={`${timeZone}:${mapSelection?.key || 0}`}
               device={selected}
-              latest={latest}
               timeZone={timeZone}
+              mapSelection={mapSelection}
             />
           </>
         )}
@@ -261,6 +283,11 @@ export default function App({ user, onLogout }) {
           onSave={saveTimeZone}
           onClose={() => setSettingsOpen(false)}
         />
+      )}
+      {mapOpen && (
+        <Suspense fallback={<p className="map-loading" role="status">Carregando mapa…</p>}>
+          <StationMap timeZone={timeZone} onClose={() => setMapOpen(false)} onVisit={openVisit} />
+        </Suspense>
       )}
     </div>
   );

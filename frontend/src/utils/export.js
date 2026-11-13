@@ -1,5 +1,6 @@
 import { formatValue, metrics } from "./metrics.js";
 import { formatTimestamp, TIME_ZONE } from "./dates.js";
+import { readingHourGuides } from "./chartAxes.js";
 
 export function download(blob, filename) {
   const url = URL.createObjectURL(blob);
@@ -146,16 +147,26 @@ export async function exportParticulateChart({
 
   const slot = (right - left) / readings.length;
   const barWidth = Math.min(36, slot - 6);
-  const tickInterval = Math.max(1, Math.ceil((multipleDates ? 100 : 64) / slot));
   const clock = new Intl.DateTimeFormat("pt-BR", {
     timeZone,
     ...(multipleDates ? { day: "2-digit", month: "2-digit" } : {}),
     hour: "2-digit",
     minute: "2-digit",
-    second: "2-digit",
   });
   context.textAlign = "center";
-  readings.forEach(({ time, complete, bands }, index) => {
+  const { guides, labels } = readingHourGuides(readings, timeZone, (multipleDates ? 100 : 64) / slot);
+  for (const { column } of guides) {
+    const x = left + column * slot;
+    context.beginPath();
+    context.moveTo(x, top);
+    context.lineTo(x, bottom);
+    context.stroke();
+  }
+  context.fillStyle = "#536b73";
+  for (const { time, column } of labels) {
+    context.fillText(clock.format(time), left + column * slot, bottom + 19);
+  }
+  readings.forEach(({ complete, bands }, index) => {
     const x = left + (index + 0.5) * slot;
     if (complete) {
       let y = bottom;
@@ -166,10 +177,6 @@ export async function exportParticulateChart({
         context.fillStyle = metrics[key].color;
         context.fillRect(x - barWidth / 2, y, barWidth, bandHeight);
       }
-    }
-    if (index % tickInterval === 0) {
-      context.fillStyle = "#536b73";
-      context.fillText(clock.format(time), x, bottom + 19);
     }
   });
 

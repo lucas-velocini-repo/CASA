@@ -78,6 +78,7 @@ class DeviceAccess(Base):
     granted_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
     granted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    retain_history: Mapped[bool] = mapped_column(default=False, server_default=text("false"))
     __table_args__ = (
         CheckConstraint(
             "data_until IS NULL OR data_until > data_from", name="ck_access_period"

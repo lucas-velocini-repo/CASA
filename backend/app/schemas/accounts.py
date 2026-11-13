@@ -65,9 +65,13 @@ class AccessRequest(StrictModel):
     device_id: int
     data_from: AwareDatetime
     data_until: AwareDatetime | None = None
+    new_installation: bool = False
+    backfill_initial: bool = False
 
     @model_validator(mode="after")
     def period(self):
+        if self.backfill_initial and not self.new_installation:
+            raise ValueError("A confirmação da instalação exige uma transferência.")
         if self.data_until and self.data_until <= self.data_from:
             raise ValueError("O fim do período deve ser posterior ao início.")
         return self

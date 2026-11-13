@@ -1,29 +1,26 @@
-import { useState } from "react";
-import { RadioTower, Search, MapPin } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { RadioTower, Search, MapPin, Map } from "lucide-react";
 
-export default function StationSelector({ devices, selectedId, onSelect }) {
+export default function StationSelector({ devices, selectedId, onSelect, onOpenMap }) {
   const [search, setSearch] = useState("");
+  const list = useRef(null);
   const filtered = devices.filter((device) =>
     `${device.name} ${device.device_id}`
       .toLocaleLowerCase("pt-BR")
       .includes(search.toLocaleLowerCase("pt-BR")),
   );
+  useEffect(() => {
+    const element = list.current;
+    if (element.scrollWidth <= element.clientWidth) return;
+    const card = element.querySelector(".selected");
+    if (!card) return;
+    const bounds = element.getBoundingClientRect();
+    const selected = card.getBoundingClientRect();
+    if (selected.left < bounds.left) element.scrollLeft += selected.left - bounds.left - 4;
+    else if (selected.right > bounds.right) element.scrollLeft += selected.right - bounds.right + 4;
+  }, [selectedId, search]);
+
   return (
-    <>
-      <div className="mobile-stations">
-        <label htmlFor="station-mobile">Estação</label>
-        <select
-          id="station-mobile"
-          value={selectedId || ""}
-          onChange={(event) => onSelect(event.target.value)}
-        >
-          {devices.map((device) => (
-            <option key={device.device_id} value={device.device_id}>
-              {device.name || device.device_id}
-            </option>
-          ))}
-        </select>
-      </div>
       <aside className="sidebar" aria-label="Estações">
         <div className="sidebar-heading">
           <h2>Estações</h2>
@@ -39,7 +36,7 @@ export default function StationSelector({ devices, selectedId, onSelect }) {
             onChange={(event) => setSearch(event.target.value)}
           />
         </label>
-        <div className="station-list">
+        <div className="station-list" ref={list}>
           {filtered.map((device) => (
             <button
               key={device.device_id}
@@ -66,11 +63,15 @@ export default function StationSelector({ devices, selectedId, onSelect }) {
         {!filtered.length && (
           <p className="muted">Nenhuma estação encontrada.</p>
         )}
+        {onOpenMap && (
+          <button type="button" className="station-map-button" onClick={onOpenMap}>
+            <Map size={17} aria-hidden="true" /> Buscar no mapa
+          </button>
+        )}
         <div className="sidebar-footer">
           <span className="eyebrow">PROJETO CASA</span>
           <p>Monitoramento ambiental</p>
         </div>
       </aside>
-    </>
   );
 }
