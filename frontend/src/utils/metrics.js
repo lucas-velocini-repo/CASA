@@ -116,9 +116,12 @@ export function particulateBands(values, keys = PM_KEYS) {
   return keys.map((key, index) => {
     const value = values?.[key];
     const previous = index === 0 ? 0 : values?.[keys[index - 1]];
+    // PM channels can differ by a few millionths when their concentrations coincide.
+    // Tolerate this only in the visual segments; keep the reported values unchanged.
+    const tolerance = PM_KEYS.includes(key) ? 1e-5 : 0;
     const difference =
-      Number.isFinite(value) && Number.isFinite(previous) && previous >= 0 && value >= previous
-        ? value - previous
+      Number.isFinite(value) && Number.isFinite(previous) && previous >= 0 && value >= 0 && value >= previous - tolerance
+        ? Math.max(0, value - previous)
         : null;
     return { key, value, difference };
   });

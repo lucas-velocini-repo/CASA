@@ -194,6 +194,53 @@ test("PM segments use adjacent cumulative differences and flag missing or decrea
   assert.deepEqual(differences({ pm1: 2, pm25: 5, pm4: 5, pm10: 6.5 }), [2, 3, 0, 1.5]);
   assert.deepEqual(differences({ pm1: 0, pm4: 5, pm10: 4 }), [0, null, null, null]);
 });
+
+test("BETA 4 PM columns tolerate tiny channel inversions without changing reported values", () => {
+  const rows = [
+    [28677, 2.162533, 2.286796, 2.286795, 2.286795],
+    [28679, 2.428543, 2.568092, 2.568091, 2.568091],
+    [28682, 1.773976, 1.875912, 1.875911, 1.875911],
+    [28684, 2.004173, 2.119338, 2.119336, 2.119336],
+  ].map(([measurement_id, ...values], index) => ({
+    measurement_id,
+    time: Date.parse("2026-11-23T16:13:07Z") + index * 300_000,
+    values: Object.freeze(Object.fromEntries(PM_KEYS.map((key, i) => [key, values[i]]))),
+  }));
+  const original = JSON.stringify(rows);
+  const { readings, hasData, hasMissing } = prepareParticulateReadings(rows, PM_KEYS);
+  assert.equal(hasData, true);
+  assert.equal(hasMissing, false);
+  assert.equal(readings.length, 4);
+  for (const [index, reading] of readings.entries()) {
+    assert.equal(reading.complete, true);
+    assert.deepEqual(reading.bands.slice(2).map(({ difference }) => difference), [0, 0]);
+    assert.deepEqual(reading.bands.map(({ value }) => value), PM_KEYS.map((key) => rows[index].values[key]));
+  }
+  assert.equal(JSON.stringify(rows), original);
+  assert.match(makeCsv(rows, "UTC", PM_KEYS), /2\.286795/);
+});
+
+test("PM tolerance keeps missing, non-finite, negative and materially decreasing readings invalid", () => {
+  const base = { pm1: 1, pm25: 2, pm4: 2, pm10: 3 };
+  const values = [
+    { ...base, pm4: 1.99998 },
+    { ...base, pm4: null },
+    { ...base, pm4: undefined },
+    { ...base, pm4: NaN },
+    { ...base, pm4: Infinity },
+    { ...base, pm1: -0.000001 },
+    { pm1: 0, pm25: -0.000001, pm4: 0, pm10: 0 },
+  ];
+  for (const item of values) {
+    assert.ok(particulateBands(item).some(({ difference }) => difference === null));
+  }
+  assert.deepEqual(
+    particulateBands({ pm1: 0, pm25: 0, pm4: 0, pm10: 0 }).map(({ difference }) => difference),
+    [0, 0, 0, 0],
+  );
+  const nc = { nc05: 1, nc10: 2, nc25: 1.999999, nc40: 3, nc100: 4 };
+  assert.equal(particulateBands(nc, NC_KEYS)[2].difference, null);
+});
 test("PM and NC measurements use two decimal places, including particle size", () => {
   assert.equal(formatMeasurement(3, "pm10"), "3,00");
   assert.equal(formatMeasurement(3.456, "nc05"), "3,46");
